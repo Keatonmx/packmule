@@ -11,6 +11,21 @@
 import Foundation
 import Network
 
+/// Lock-guarded one-shot flag, safe to trip from connection callbacks.
+final class OnceFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var tripped = false
+
+    /// True the first time only.
+    func trip() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if tripped { return false }
+        tripped = true
+        return true
+    }
+}
+
 // MARK: - Client (one control connection)
 
 actor FTPClient {
@@ -44,20 +59,18 @@ actor FTPClient {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else { throw VolumeError.badAddress }
         let conn = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: Self.tcpParams())
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            var done = false
+            let once = OnceFlag()
             conn.stateUpdateHandler = { state in
-                guard !done else { return }
                 switch state {
                 case .ready:
-                    done = true
-                    cont.resume()
+                    if once.trip() { cont.resume() }
                 case .failed(let error):
-                    done = true
-                    conn.cancel()
-                    cont.resume(throwing: error)
+                    if once.trip() {
+                        conn.cancel()
+                        cont.resume(throwing: error)
+                    }
                 case .cancelled:
-                    done = true
-                    cont.resume(throwing: VolumeError.cancelled)
+                    if once.trip() { cont.resume(throwing: VolumeError.cancelled) }
                 default:
                     break
                 }
