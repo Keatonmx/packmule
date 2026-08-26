@@ -267,6 +267,14 @@ final class FTPServerSession {
         case "NOOP":
             reply("200 Standing by")
             return
+        case "HOST":
+            reply("200 Sure")
+            return
+        case "AUTH", "ADAT", "PBSZ", "PROT":
+            // FileZilla and friends probe for TLS before signing in; a clean
+            // refusal lets them fall back to plain FTP instead of giving up.
+            reply("502 Plain FTP only here, no TLS")
+            return
         default:
             break
         }
