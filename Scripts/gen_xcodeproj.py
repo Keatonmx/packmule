@@ -115,9 +115,13 @@ def main():
     # Sources under Packmule/
     app_group = p.walk(SRC_DIR)
 
-    # Swift packages
+    # Swift packages. AMSMB2's product is a DYNAMIC library, so besides linking
+    # it we must copy it into the app's Frameworks/ folder; a hand-rolled
+    # pbxproj gets no auto-embedding, and without it the app dies at launch
+    # (dyld: Library not loaded @rpath/AMSMB2.framework/AMSMB2).
     package_refs = []
     product_dep_ids = []
+    embed_files = []
     for name, url, version, products in PACKAGES:
         pkg_id = uid('pkgref:' + url)
         p.add(pkg_id, 'XCRemoteSwiftPackageReference',
@@ -132,6 +136,11 @@ def main():
             bf = uid('buildfile:frameworks:' + product)
             p.add(bf, 'PBXBuildFile', f'{{isa = PBXBuildFile; productRef = {dep_id}; }}')
             p.build_files['frameworks'].append(bf)
+            ebf = uid('buildfile:embed:' + product)
+            p.add(ebf, 'PBXBuildFile',
+                  f'{{isa = PBXBuildFile; productRef = {dep_id}; '
+                  f'settings = {{ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }}; }}')
+            embed_files.append(ebf)
 
     # Product
     app_ref = uid('product:app')
@@ -163,6 +172,13 @@ def main():
     sources_phase = phase('phase:sources', 'PBXSourcesBuildPhase', p.build_files['sources'])
     frameworks_phase = phase('phase:frameworks', 'PBXFrameworksBuildPhase', p.build_files['frameworks'])
     resources_phase = phase('phase:resources', 'PBXResourcesBuildPhase', p.build_files['resources'])
+
+    embed_items = ' '.join(f'{f},' for f in embed_files)
+    embed_phase = uid('phase:embed')
+    p.add(embed_phase, 'PBXCopyFilesBuildPhase',
+          f'{{isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; '
+          f'dstSubfolderSpec = 10; files = ({embed_items}); name = "Embed Frameworks"; '
+          f'runOnlyForDeploymentPostprocessing = 0; }}')
 
     # Build configurations
     project_common = {
@@ -244,7 +260,7 @@ def main():
     target = uid('target:app')
     product_deps = ' '.join(f'{d},' for d in product_dep_ids)
     p.add(target, 'PBXNativeTarget',
-          f'{{isa = PBXNativeTarget; buildConfigurationList = {tgt_configs}; buildPhases = ({sources_phase}, {frameworks_phase}, {resources_phase}, ); '
+          f'{{isa = PBXNativeTarget; buildConfigurationList = {tgt_configs}; buildPhases = ({sources_phase}, {frameworks_phase}, {resources_phase}, {embed_phase}, ); '
           f'buildRules = (); dependencies = (); name = {PROJECT_NAME}; packageProductDependencies = ({product_deps}); productName = {PROJECT_NAME}; '
           f'productReference = {app_ref}; productType = "com.apple.product-type.application"; }}')
 

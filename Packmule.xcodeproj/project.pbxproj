@@ -32,9 +32,14 @@
 		C2BB958A5FB16C76E27C32BB = {isa = PBXBuildFile; fileRef = CF00C16CE0EAF184A1DF14EC; };
 		C46AF3CC1763A437841901A6 = {isa = PBXBuildFile; fileRef = A514ECB04471827B4D39C165; };
 		C723F2BA6BABDFDDFF764221 = {isa = PBXBuildFile; fileRef = B12D1DF9035342C1C417555A; };
+		DB59EE34495D9084AF377D23 = {isa = PBXBuildFile; productRef = 20090E3EC4E502F03A346D34; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DE6B142D580F452326A79B4C = {isa = PBXBuildFile; fileRef = 0DD97EA582A975749A076AC9; };
 		EB0C79438B800F9EC7C2D227 = {isa = PBXBuildFile; fileRef = 3CF942266912C1F22838D510; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		BAE1492BDE49D13FF7E211EB = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 10; files = (DB59EE34495D9084AF377D23,); name = "Embed Frameworks"; runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		021DFB730A34A1AD9B10E235 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
@@ -89,7 +94,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E3435DDA2687639586BF0B70 = {isa = PBXNativeTarget; buildConfigurationList = 354589B28580510B6EC24620; buildPhases = (7A70D71C385290AF96BF1031, 424153ED3CD079DB4DB459AF, 285BB1C1430063331E9F5DD0, ); buildRules = (); dependencies = (); name = Packmule; packageProductDependencies = (20090E3EC4E502F03A346D34,); productName = Packmule; productReference = 84337AD8D27FCD69AF2C4FC2; productType = "com.apple.product-type.application"; };
+		E3435DDA2687639586BF0B70 = {isa = PBXNativeTarget; buildConfigurationList = 354589B28580510B6EC24620; buildPhases = (7A70D71C385290AF96BF1031, 424153ED3CD079DB4DB459AF, 285BB1C1430063331E9F5DD0, BAE1492BDE49D13FF7E211EB, ); buildRules = (); dependencies = (); name = Packmule; packageProductDependencies = (20090E3EC4E502F03A346D34,); productName = Packmule; productReference = 84337AD8D27FCD69AF2C4FC2; productType = "com.apple.product-type.application"; };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */

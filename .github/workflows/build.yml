@@ -112,6 +112,10 @@ jobs:
             2>&1 | tee xcodebuild-device.log | (grep -E "error:|BUILD " || true)
           APP="$DERIVED/Build/Products/Release-iphoneos/Packmule.app"
           test -x "$APP/Packmule"
+          # AMSMB2 is a dynamic framework; the app dies at launch if it is
+          # not embedded. Fail here rather than ship a broken IPA.
+          test -e "$APP/Frameworks/AMSMB2.framework/AMSMB2"
+          ls -la "$APP/Frameworks"
           rm -rf ipa && mkdir -p ipa/Payload
           cp -R "$APP" ipa/Payload/
           (cd ipa && zip -qry ../Packmule-unsigned.ipa Payload)
