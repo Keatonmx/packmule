@@ -183,19 +183,40 @@ final class JellyfinVolume: RemoteVolume {
     // MARK: transfers
 
     func download(_ entry: FileEntry, to url: URL, progress: @escaping TransferProgress) async throws {
+        try await download(entry, to: url, resumingFrom: 0, progress: progress)
+    }
+
+    func download(_ entry: FileEntry, to url: URL, resumingFrom offset: Int64,
+                  progress: @escaping TransferProgress) async throws {
         guard let item = items[entry.path] else { throw VolumeError.notFound(entry.name) }
         guard let source = self.url("Items/\(item.Id)/Download", query: ["api_key": token]) else {
             throw VolumeError.badAddress
         }
-        _ = progress(0, entry.size ?? -1)
-        let (temp, response) = try await URLSession.shared.download(from: source)
+        _ = progress(offset, entry.size ?? -1)
+        var request = URLRequest(url: source)
+        if offset > 0 {
+            request.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range")
+        }
+        let (temp, response) = try await URLSession.shared.download(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else {
             try? FileManager.default.removeItem(at: temp)
             throw VolumeError.protocolFailure("Jellyfin answered \(code)")
         }
-        try? FileManager.default.removeItem(at: url)
-        try FileManager.default.moveItem(at: temp, to: url)
+        if code == 206, offset > 0 {
+            // Partial content: stitch the new bytes onto the existing tail.
+            let handle = try appendHandle(for: url, at: offset)
+            defer { try? handle.close() }
+            let reading = try FileHandle(forReadingFrom: temp)
+            defer { try? reading.close() }
+            while let chunk = try reading.read(upToCount: 1 << 20), !chunk.isEmpty {
+                try handle.write(contentsOf: chunk)
+            }
+            try? FileManager.default.removeItem(at: temp)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+            try FileManager.default.moveItem(at: temp, to: url)
+        }
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
         let size = (attrs?[.size] as? Int64) ?? entry.size ?? -1
         _ = progress(size, size)

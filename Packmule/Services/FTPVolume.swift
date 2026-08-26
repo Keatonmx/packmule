@@ -291,7 +291,7 @@ actor FTPClient {
             .map(String.init)
     }
 
-    func download(path: String, to url: URL, expectedSize: Int64,
+    func download(path: String, to url: URL, expectedSize: Int64, resumeFrom: Int64 = 0,
                   progress: @escaping TransferProgress) async throws {
         await acquire()
         defer { release() }
@@ -299,10 +299,16 @@ actor FTPClient {
         if total <= 0, let reply = try? await command("SIZE \(path)", allow: [213]) {
             total = Int64(reply.text.dropFirst(4).filter { $0.isNumber }) ?? -1
         }
-        FileManager.default.createFile(atPath: url.path, contents: nil)
-        let handle = try FileHandle(forWritingTo: url)
+        let handle = try appendHandle(for: url, at: resumeFrom)
         defer { try? handle.close() }
-        _ = try await dataTransfer("RETR \(path)", expectSize: total, progress: progress, sink: handle)
+        if resumeFrom > 0 {
+            // REST applies to the next RETR; servers that lack it make us start over.
+            try await command("REST \(resumeFrom)", allow: [350])
+        }
+        let offset = resumeFrom
+        _ = try await dataTransfer("RETR \(path)", expectSize: total,
+                                   progress: { got, tot in progress(offset + got, tot) },
+                                   sink: handle)
     }
 
     func upload(localURL: URL, toPath path: String, progress: @escaping TransferProgress) async throws {
@@ -494,6 +500,14 @@ final class FTPVolume: RemoteVolume {
     func download(_ entry: FileEntry, to url: URL, progress: @escaping TransferProgress) async throws {
         try await withFreshClient { c in
             try await c.download(path: entry.path, to: url, expectedSize: entry.size ?? -1, progress: progress)
+        }
+    }
+
+    func download(_ entry: FileEntry, to url: URL, resumingFrom offset: Int64,
+                  progress: @escaping TransferProgress) async throws {
+        try await withFreshClient { c in
+            try await c.download(path: entry.path, to: url, expectedSize: entry.size ?? -1,
+                                 resumeFrom: max(0, offset), progress: progress)
         }
     }
 

@@ -78,6 +78,11 @@ final class SFTPVolume: RemoteVolume {
     }
 
     func download(_ entry: FileEntry, to url: URL, progress: @escaping TransferProgress) async throws {
+        try await download(entry, to: url, resumingFrom: 0, progress: progress)
+    }
+
+    func download(_ entry: FileEntry, to url: URL, resumingFrom startOffset: Int64,
+                  progress: @escaping TransferProgress) async throws {
         await gate.acquire()
         defer { Task { await gate.release() } }
         let sftp = try requireSFTP()
@@ -86,10 +91,9 @@ final class SFTPVolume: RemoteVolume {
         do {
             let attrs = try? await file.readAttributes()
             let total = (attrs?.size).map { Int64(clamping: $0) } ?? entry.size ?? -1
-            FileManager.default.createFile(atPath: url.path, contents: nil)
-            let handle = try FileHandle(forWritingTo: url)
+            let handle = try appendHandle(for: url, at: startOffset)
             defer { try? handle.close() }
-            var offset: UInt64 = 0
+            var offset = UInt64(max(0, startOffset))
             let chunkSize: UInt32 = 512 * 1024
             while true {
                 let buffer = try await file.read(from: offset, length: chunkSize)

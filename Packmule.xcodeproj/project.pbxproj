@@ -16,6 +16,7 @@
 		1D26BE151E793B74CF69014B = {isa = PBXBuildFile; fileRef = B0B647A09AED1130BE926E27; };
 		1F3661C7D7B9E776B39FD36C = {isa = PBXBuildFile; productRef = 20090E3EC4E502F03A346D34; };
 		2DA44A5867DD21D8FA4903AF = {isa = PBXBuildFile; productRef = F080E9A9D873D11F583085D4; };
+		2E9775C8420DFE7F944A7DAC = {isa = PBXBuildFile; fileRef = FC526841EDDC23A45D867C4F; };
 		371DC9EC701F30A7382E1C55 = {isa = PBXBuildFile; fileRef = CC1A0588846258E4D079E443; };
 		455900FE7BB4B24A04981D31 = {isa = PBXBuildFile; fileRef = 8F2CB69AA0778A299C17BC9D; };
 		4589AEC8A9E93B92D98CEDC7 = {isa = PBXBuildFile; fileRef = 6E831A93F0A2C128CDC3DDBF; };
@@ -23,6 +24,7 @@
 		4610E7F6A4E31BCFFF1F40DD = {isa = PBXBuildFile; fileRef = B5F306151D79B33F5E4D5FD3; };
 		4F5B3131300C51D0B6AC5638 = {isa = PBXBuildFile; fileRef = 6DB2B758547E5B484A76597B; };
 		597A8872A644817AD2C2CE2C = {isa = PBXBuildFile; fileRef = CC4973FE1981271D0DFDA8B3; };
+		5B69E08DDE3FCA029E5F5BE1 = {isa = PBXBuildFile; fileRef = 53349F11CEBBB9053B28128D; };
 		5C3D421A2D49B9D73F8D7487 = {isa = PBXBuildFile; fileRef = 0ED766BB0242728570375309; };
 		5E349F20D8E79CEB30A2CE5E = {isa = PBXBuildFile; fileRef = 4812B821030114AFE8BBF15D; };
 		607A3E00F727BEE215EC1E82 = {isa = PBXBuildFile; fileRef = 294FD757F6D2473C1379C08B; };
@@ -30,11 +32,13 @@
 		641D3974D4EA97CF89FE61AC = {isa = PBXBuildFile; fileRef = B604C43995FA1F0B0E7A7471; };
 		69E84CC0194EFBB8C75ECD99 = {isa = PBXBuildFile; fileRef = C2E2A8883B9638EAD9A93596; };
 		70E9F98EBCC4C9A518EFD697 = {isa = PBXBuildFile; fileRef = 177BFD35E909C382EC418F73; };
+		79CBEDEEE0C02DF26298ACE1 = {isa = PBXBuildFile; fileRef = 60821D9109D9C1375C598495; };
 		7D1E927F434F69EE50D62BCC = {isa = PBXBuildFile; fileRef = 5B76D93E4D60B31B628ADC3A; };
 		7FB3687716BF83EC70926FF9 = {isa = PBXBuildFile; fileRef = 4210DD75299C132DE2028543; };
 		862BCBE0C844288EF1B3F300 = {isa = PBXBuildFile; fileRef = 19A0ACA59F601BC82EC6C56C; };
 		A31AABA2ED22B9BBF688F5C8 = {isa = PBXBuildFile; fileRef = 1A509AF8FBA8EFECD90848F9; };
 		A78660FF9E97864BE6487D2A = {isa = PBXBuildFile; fileRef = 56384EA8965B95FCA3B4E246; };
+		A902917F1AE67B46B234CD22 = {isa = PBXBuildFile; fileRef = 69D52DAFF9F1E1C0C8B2141E; };
 		B4FF508DAA07BCBE2C7C85CF = {isa = PBXBuildFile; fileRef = 639E16EFDD5BD92F1A58B16B; };
 		C2BB958A5FB16C76E27C32BB = {isa = PBXBuildFile; fileRef = CF00C16CE0EAF184A1DF14EC; };
 		C46AF3CC1763A437841901A6 = {isa = PBXBuildFile; fileRef = A514ECB04471827B4D39C165; };
@@ -68,10 +72,13 @@
 		4210DD75299C132DE2028543 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalVolume.swift; sourceTree = "<group>"; };
 		460D3D1AA69424190CE8DFF7 = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4812B821030114AFE8BBF15D = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		53349F11CEBBB9053B28128D = {isa = PBXFileReference; lastKnownFileType = text; path = "lgpl-2.1.txt"; sourceTree = "<group>"; };
 		56384EA8965B95FCA3B4E246 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoVolume.swift; sourceTree = "<group>"; };
 		5B76D93E4D60B31B628ADC3A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Discovery.swift; sourceTree = "<group>"; };
+		60821D9109D9C1375C598495 = {isa = PBXFileReference; lastKnownFileType = text; path = citadel.txt; sourceTree = "<group>"; };
 		639E16EFDD5BD92F1A58B16B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransfersSheet.swift; sourceTree = "<group>"; };
 		6601D6A85FFFE44F4EA36665 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		69D52DAFF9F1E1C0C8B2141E = {isa = PBXFileReference; lastKnownFileType = text; path = "swift-nio.txt"; sourceTree = "<group>"; };
 		6BCAAD75D5EAA6A2F16A63C2 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FTPServer.swift; sourceTree = "<group>"; };
 		6DB2B758547E5B484A76597B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferQueue.swift; sourceTree = "<group>"; };
 		6E831A93F0A2C128CDC3DDBF = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JellyfinVolume.swift; sourceTree = "<group>"; };
@@ -90,6 +97,7 @@
 		CF00C16CE0EAF184A1DF14EC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		DD25367FF2F1F632A62D19DE = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = gen_xcodeproj.py; sourceTree = "<group>"; };
 		E75F2F0FCDF35685370ED49A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerActionsSheet.swift; sourceTree = "<group>"; };
+		FC526841EDDC23A45D867C4F = {isa = PBXFileReference; lastKnownFileType = text; path = libsmb2.txt; sourceTree = "<group>"; };
 		FF5813F3E6A50216F92B0FB3 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -99,10 +107,11 @@
 
 /* Begin PBXGroup section */
 		101CA24F7CDC09F0C0636D9F = {isa = PBXGroup; children = (C1BA79735D2A7200650A01D7, 744563C6436626218FEB1B07, 8F5E1252D4BF9536974FA458, 336144BB30BA0BED89AE7139,); path = Packmule; sourceTree = "<group>"; };
+		1701F5037C24A4DD390C28E4 = {isa = PBXGroup; children = (60821D9109D9C1375C598495, 53349F11CEBBB9053B28128D, FC526841EDDC23A45D867C4F, 69D52DAFF9F1E1C0C8B2141E,); path = Licenses; sourceTree = "<group>"; };
 		336144BB30BA0BED89AE7139 = {isa = PBXGroup; children = (021DFB730A34A1AD9B10E235, 596F11E4A813FB627696B7A3, CF00C16CE0EAF184A1DF14EC, B5F306151D79B33F5E4D5FD3, 4F53F936A07DEF5C449D21DC,); path = UI; sourceTree = "<group>"; };
 		4F53F936A07DEF5C449D21DC = {isa = PBXGroup; children = (C2E2A8883B9638EAD9A93596, 294FD757F6D2473C1379C08B, 316D4B844A10575E0813E2D4, B0B647A09AED1130BE926E27, E75F2F0FCDF35685370ED49A, 09AB4F48608E4866068209A6, 639E16EFDD5BD92F1A58B16B,); path = Sheets; sourceTree = "<group>"; };
 		596F11E4A813FB627696B7A3 = {isa = PBXGroup; children = (19A0ACA59F601BC82EC6C56C,); path = Components; sourceTree = "<group>"; };
-		744563C6436626218FEB1B07 = {isa = PBXGroup; children = (460D3D1AA69424190CE8DFF7, 6601D6A85FFFE44F4EA36665, 25D33AA941B2BBF7A236FD7B,); path = Resources; sourceTree = "<group>"; };
+		744563C6436626218FEB1B07 = {isa = PBXGroup; children = (460D3D1AA69424190CE8DFF7, 6601D6A85FFFE44F4EA36665, 1701F5037C24A4DD390C28E4, 25D33AA941B2BBF7A236FD7B,); path = Resources; sourceTree = "<group>"; };
 		8F5E1252D4BF9536974FA458 = {isa = PBXGroup; children = (56384EA8965B95FCA3B4E246, 5B76D93E4D60B31B628ADC3A, 6BCAAD75D5EAA6A2F16A63C2, 1A509AF8FBA8EFECD90848F9, 8F2CB69AA0778A299C17BC9D, 6E831A93F0A2C128CDC3DDBF, 3CF942266912C1F22838D510, CC4973FE1981271D0DFDA8B3, 4210DD75299C132DE2028543, 7333EB8084AF88DAF4F37725, CC1A0588846258E4D079E443, 0ED766BB0242728570375309, 003D01D79D0FB4AC34675C89, A514ECB04471827B4D39C165, B12D1DF9035342C1C417555A, 0DD97EA582A975749A076AC9, 6DB2B758547E5B484A76597B,); path = Services; sourceTree = "<group>"; };
 		B4D38C44D7D8C136F71E955D = {isa = PBXGroup; children = (84337AD8D27FCD69AF2C4FC2,); name = Products; sourceTree = "<group>"; };
 		C1BA79735D2A7200650A01D7 = {isa = PBXGroup; children = (B604C43995FA1F0B0E7A7471, FF5813F3E6A50216F92B0FB3, 4812B821030114AFE8BBF15D, 1293BE4680CCE305B7027AEE, 177BFD35E909C382EC418F73,); path = App; sourceTree = "<group>"; };
@@ -119,7 +128,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		285BB1C1430063331E9F5DD0 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (15D5825072AF4C8DBFECA3A5,); runOnlyForDeploymentPostprocessing = 0; };
+		285BB1C1430063331E9F5DD0 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (15D5825072AF4C8DBFECA3A5, 79CBEDEEE0C02DF26298ACE1, 5B69E08DDE3FCA029E5F5BE1, 2E9775C8420DFE7F944A7DAC, A902917F1AE67B46B234CD22,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -142,6 +151,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (SIDELOAD, "$(inherited)",);
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -187,6 +197,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (SIDELOAD, "$(inherited)",);
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				VERSIONING_SYSTEM = "apple-generic";

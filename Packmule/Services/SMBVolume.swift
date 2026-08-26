@@ -112,6 +112,32 @@ final class SMBVolume: RemoteVolume {
         }
     }
 
+    func download(_ entry: FileEntry, to url: URL, resumingFrom offset: Int64,
+                  progress: @escaping TransferProgress) async throws {
+        guard offset > 0 else {
+            try await download(entry, to: url, progress: progress)
+            return
+        }
+        let (share, rel) = try target(entry.path)
+        try await ensureShare(share)
+        let client = try requireClient()
+        let total = entry.size ?? -1
+        let handle = try appendHandle(for: url, at: offset)
+        defer { try? handle.close() }
+        var position = offset
+        let chunk: Int64 = 4 * 1024 * 1024
+        while total < 0 || position < total {
+            let end = total < 0 ? position + chunk : min(position + chunk, total)
+            let data = try await client.contents(atPath: rel,
+                                                 range: UInt64(position)..<UInt64(end),
+                                                 progress: nil)
+            if data.isEmpty { break }
+            try handle.write(contentsOf: data)
+            position += Int64(data.count)
+            if !progress(position, total) { throw VolumeError.cancelled }
+        }
+    }
+
     func upload(_ localURL: URL, toDirectory dir: String, name: String, progress: @escaping TransferProgress) async throws {
         let (share, relDir) = try target(VolumePath.join(dir, name))
         try await ensureShare(share)

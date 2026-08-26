@@ -52,6 +52,15 @@ struct SettingsSheet: View {
                         }
                     }
 
+                    SectionHeader(title: "Transfers")
+                    Card {
+                        SettingsRow(title: "Keep the screen awake while hauling",
+                                    subtitle: "iOS pauses transfers when the phone locks. On means the screen stays lit until the queue empties",
+                                    showsSeparator: false) {
+                            MuleToggle(isOn: $model.settings.keepAwakeWhileHauling)
+                        }
+                    }
+
                     SectionHeader(title: "Safety")
                     Card {
                         SettingsRow(title: "Ask before deleting", showsSeparator: false) {

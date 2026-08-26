@@ -45,6 +45,10 @@ protocol RemoteVolume: AnyObject {
     func connect() async throws
     func list(_ path: String) async throws -> [FileEntry]
     func download(_ entry: FileEntry, to url: URL, progress: @escaping TransferProgress) async throws
+    /// Continue a partial download from `offset` bytes. Progress reports
+    /// ABSOLUTE bytes (offset included). The default restarts from zero.
+    func download(_ entry: FileEntry, to url: URL, resumingFrom offset: Int64,
+                  progress: @escaping TransferProgress) async throws
     func upload(_ localURL: URL, toDirectory dir: String, name: String, progress: @escaping TransferProgress) async throws
     func delete(_ entry: FileEntry) async throws
     func createFolder(named name: String, in dir: String) async throws
@@ -71,4 +75,22 @@ extension RemoteVolume {
     var isReadOnly: Bool { false }
     func localURL(for entry: FileEntry) -> URL? { nil }
     func reader(for entry: FileEntry) async throws -> RandomAccessReader? { nil }
+
+    func download(_ entry: FileEntry, to url: URL, resumingFrom offset: Int64,
+                  progress: @escaping TransferProgress) async throws {
+        try? FileManager.default.removeItem(at: url)
+        try await download(entry, to: url, progress: progress)
+    }
+}
+
+/// Shared helper: open `url` for appending at exactly `offset` bytes,
+/// truncating any torn tail from the interrupted attempt.
+func appendHandle(for url: URL, at offset: Int64) throws -> FileHandle {
+    if !FileManager.default.fileExists(atPath: url.path) {
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+    }
+    let handle = try FileHandle(forWritingTo: url)
+    try handle.truncate(atOffset: UInt64(max(0, offset)))
+    try handle.seekToEnd()
+    return handle
 }

@@ -109,6 +109,8 @@ struct RootView: View {
                     AboutSheet()
                 case .host:
                     HostSheet()
+                case .passwordPrompt(let server):
+                    PasswordPromptSheet(server: server)
                 }
             }
         }

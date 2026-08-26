@@ -27,6 +27,8 @@ enum ActiveSheet: Equatable {
     case settings
     case about
     case host
+    /// The server's password isn't stored; ask, connect, forget.
+    case passwordPrompt(SavedServer)
 }
 
 @MainActor
@@ -84,6 +86,7 @@ final class AppModel: ObservableObject {
         servers = ServerStore.load()
         ButtonHaptics.shared.enabled = settings.haptics
         transfers.onFinished = { [weak self] item in self?.transferFinished(item) }
+        transfers.onActivity = { [weak self] in self?.updateIdleTimer() }
         #if DEBUG
         handleLaunchArguments()
         #endif
@@ -161,8 +164,23 @@ final class AppModel: ObservableObject {
 
     func connect(_ server: SavedServer) {
         guard connectingID == nil else { return }
+        if server.asksForPassword {
+            openSheet(.passwordPrompt(server))
+            return
+        }
+        startConnect(server, password: Keychain.password(for: server.id) ?? "")
+    }
+
+    /// From the password prompt; the password is used once and not stored.
+    func connect(_ server: SavedServer, oneTimePassword: String) {
+        guard connectingID == nil else { return }
+        openSheet(nil)
+        startConnect(server, password: oneTimePassword)
+    }
+
+    private func startConnect(_ server: SavedServer, password: String) {
         connectingID = server.id
-        let volume = makeVolume(for: server)
+        let volume = makeVolume(for: server, password: password)
         Task {
             do {
                 try await volume.connect()
@@ -188,8 +206,7 @@ final class AppModel: ObservableObject {
         return trimmed.hasPrefix("/") ? trimmed : "/" + trimmed
     }
 
-    private func makeVolume(for server: SavedServer) -> any RemoteVolume {
-        let password = Keychain.password(for: server.id) ?? ""
+    private func makeVolume(for server: SavedServer, password: String) -> any RemoteVolume {
         switch server.kind {
         case .smb:
             return SMBVolume(host: server.host, port: server.port, share: server.share,
@@ -519,9 +536,15 @@ final class AppModel: ObservableObject {
 
     func playerClosed() {
         MediaStreamer.shared.clearTarget()
-        if !ftpServer.running {
-            UIApplication.shared.isIdleTimerDisabled = false
-        }
+        updateIdleTimer()
+    }
+
+    /// One place decides whether the screen may sleep: hauling (when the
+    /// setting allows), hosting, and the player all keep it lit.
+    func updateIdleTimer() {
+        let hauling = settings.keepAwakeWhileHauling && transfers.activeCount > 0
+        UIApplication.shared.isIdleTimerDisabled =
+            hauling || ftpServer.running || playerRequest != nil
     }
 
     // MARK: - Errors people can read

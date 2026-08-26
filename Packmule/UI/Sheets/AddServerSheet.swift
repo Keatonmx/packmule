@@ -23,6 +23,7 @@ struct AddServerSheet: View {
     @State private var username: String
     @State private var password = ""
     @State private var passwordTouched = false
+    @State private var rememberPassword: Bool
 
     init(prefill: SavedServer?, isEdit: Bool) {
         self.prefill = prefill
@@ -35,6 +36,12 @@ struct AddServerSheet: View {
         _share = State(initialValue: s.share)
         _startPath = State(initialValue: s.startPath == "/" ? "" : s.startPath)
         _username = State(initialValue: s.username)
+        _rememberPassword = State(initialValue: !(s.rememberPassword == false))
+    }
+
+    private var passwordPlaceholder: String {
+        if !rememberPassword { return "Asked when you connect" }
+        return isEdit ? "Unchanged" : "Optional"
     }
 
     var body: some View {
@@ -66,9 +73,25 @@ struct AddServerSheet: View {
                     LabeledField(label: "User", placeholder: userPlaceholder,
                                  text: $username, keyboard: .emailAddress)
                     LabeledField(label: "Password",
-                                 placeholder: isEdit ? "Unchanged" : "Optional",
+                                 placeholder: passwordPlaceholder,
                                  text: $password, secure: true)
                         .onChange(of: password) { _ in passwordTouched = true }
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Remember password")
+                                .font(Typography.row)
+                                .foregroundColor(.white)
+                            Text(rememberPassword
+                                 ? "Kept in the iOS Keychain on this phone"
+                                 : "Packmule asks each time and keeps nothing")
+                                .font(Typography.rowSubtitle)
+                                .foregroundColor(Palette.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        MuleToggle(isOn: $rememberPassword)
+                    }
+                    .padding(.top, 2)
 
                     Text(kind == .jellyfin
                          ? "Sign in with your Jellyfin account, the same one the web app uses. Formats this phone can't play are converted by the server, so MKV works here. Paste an https address if yours sits behind a reverse proxy."
@@ -97,7 +120,11 @@ struct AddServerSheet: View {
                             if let server = buildServer() {
                                 model.save(server, password: passwordValue)
                                 model.openSheet(nil)
-                                model.connect(server)
+                                if !rememberPassword, !password.isEmpty {
+                                    model.connect(server, oneTimePassword: password)
+                                } else {
+                                    model.connect(server)
+                                }
                             }
                         }
                     }
@@ -118,8 +145,9 @@ struct AddServerSheet: View {
     }
 
     /// New servers always write the password (empty clears); edits keep the
-    /// stored one unless the field was touched.
+    /// stored one unless the field was touched. Remember off always clears.
     private var passwordValue: String? {
+        if !rememberPassword { return "" }
         if isEdit, !passwordTouched { return nil }
         return password
     }
@@ -127,6 +155,7 @@ struct AddServerSheet: View {
     private func buildServer() -> SavedServer? {
         var server = prefill ?? SavedServer()
         server.kind = kind
+        server.rememberPassword = rememberPassword ? nil : false
         server.name = name.trimmingCharacters(in: .whitespaces)
         server.share = share.trimmingCharacters(in: .whitespaces)
 
@@ -180,5 +209,55 @@ struct AddServerSheet: View {
             return nil
         }
         return server
+    }
+}
+
+/// Asked when a server is set to not remember its password.
+struct PasswordPromptSheet: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.theme) private var theme
+    let server: SavedServer
+
+    @State private var password = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        BottomSheet(onDismiss: { model.openSheet(nil) }) {
+            VStack(spacing: 12) {
+                VStack(spacing: 3) {
+                    Text("Password for \(server.displayName)")
+                        .font(Typography.dialogTitle)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text("Used once, kept nowhere")
+                        .font(Typography.meta)
+                        .foregroundColor(Palette.textTertiary)
+                }
+                SecureField("", text: $password,
+                            prompt: Text("Password").foregroundColor(Palette.textQuaternary))
+                    .font(.system(size: 15))
+                    .foregroundColor(.white)
+                    .focused($focused)
+                    .submitLabel(.go)
+                    .onSubmit { model.connect(server, oneTimePassword: password) }
+                    .padding(.horizontal, 12)
+                    .frame(height: 44)
+                    .background(theme.well)
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Palette.hairline08, lineWidth: 0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                HStack(spacing: 10) {
+                    SecondaryPill(title: "Cancel") { model.openSheet(nil) }
+                    AccentPill(title: "Connect") {
+                        model.connect(server, oneTimePassword: password)
+                    }
+                }
+                .padding(.top, 2)
+            }
+            .frame(maxWidth: .infinity)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { focused = true }
+            }
+        }
     }
 }

@@ -123,7 +123,11 @@ struct TransferRow: View {
 
     private var statusLine: String {
         switch item.status {
-        case .queued: return "Queued · \(item.detail)"
+        case .queued:
+            if item.attempts > 0 {
+                return "Retrying, attempt \(item.attempts + 1) of 3 · \(item.detail)"
+            }
+            return "Queued · \(item.detail)"
         case .running: return item.detail
         case .done: return item.direction == .download ? "Done · from \(item.detail)" : "Done · to \(item.detail)"
         case .failed(let why): return why

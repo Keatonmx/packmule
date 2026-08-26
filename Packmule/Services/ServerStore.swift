@@ -31,11 +31,13 @@ enum ServerStore {
         }
     }
 
-    /// First launch: start with the home media share already saved, so the
-    /// first tap on day one is already "Connect".
+    /// Personal sideload builds start with the home media share already saved,
+    /// so the first tap on day one is already "Connect". Public builds (built
+    /// without the SIDELOAD condition) start clean.
     private static func seedIfNeeded() -> [SavedServer] {
         guard !UserDefaults.standard.bool(forKey: seedFlag) else { return [] }
         UserDefaults.standard.set(true, forKey: seedFlag)
+        #if SIDELOAD
         var home = SavedServer()
         home.kind = .smb
         home.name = "Home media"
@@ -44,5 +46,8 @@ enum ServerStore {
         let servers = [home]
         save(servers)
         return servers
+        #else
+        return []
+        #endif
     }
 }

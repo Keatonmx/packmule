@@ -52,6 +52,11 @@ struct SavedServer: Codable, Equatable, Identifiable {
     var lastConnected: Date? = nil
     /// Jellyfin behind a reverse proxy; optional so older saves still decode.
     var https: Bool? = nil
+    /// nil or true: password lives in the Keychain. false: ask on every
+    /// connect and keep nothing. Optional so older saves still decode.
+    var rememberPassword: Bool? = nil
+
+    var asksForPassword: Bool { rememberPassword == false }
 
     var displayName: String { name.isEmpty ? host : name }
 

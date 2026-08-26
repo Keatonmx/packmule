@@ -58,6 +58,10 @@ final class TransferItem: ObservableObject, Identifiable {
     @Published var total: Int64 = -1
     /// Where the file ended up (downloads only).
     var destination: URL?
+    /// Chosen at enqueue time so retries append to the same partial file.
+    var plannedDestination: URL?
+    /// Failed tries so far; the queue resumes downloads from the partial's size.
+    var attempts = 0
 
     /// Read from the transfer thread via the progress callback.
     var cancelRequested = false
@@ -76,9 +80,13 @@ final class TransferQueue: ObservableObject {
 
     /// Fired on completion so the app can toast, open Quick Look, share.
     var onFinished: ((TransferItem) -> Void)?
+    /// Fired whenever the queue starts or stops moving (idle timer, Live Activity).
+    var onActivity: (() -> Void)?
 
+    private static let maxAttempts = 3
     private var pumping = false
-    private var work: [UUID: () async throws -> URL?] = [:]
+    /// Jobs take the byte offset to resume from (0 = fresh start).
+    private var work: [UUID: (Int64) async throws -> URL?] = [:]
 
     var activeCount: Int {
         items.filter { $0.status == .queued || $0.status == .running }.count
@@ -94,12 +102,22 @@ final class TransferQueue: ObservableObject {
                          purpose: TransferPurpose = .keep) {
         let item = TransferItem(name: entry.name, direction: .download, purpose: purpose, detail: serverName)
         item.total = entry.size ?? -1
-        work[item.id] = { [weak item] in
-            let dir = purpose == .keep ? LocalFiles.downloadsURL : LocalFiles.previewURL
-            let dest = LocalFiles.uniqueDestination(for: entry.name, in: dir)
-            try await volume.download(entry, to: dest) { bytes, total in
+        let dir = purpose == .keep ? LocalFiles.downloadsURL : LocalFiles.previewURL
+        let dest = LocalFiles.uniqueDestination(for: entry.name, in: dir)
+        item.plannedDestination = dest
+        work[item.id] = { [weak item] resumeFrom in
+            if (item?.attempts ?? 0) > 0 {
+                // The old session may be dead after a drop; reconnecting is cheap.
+                try? await volume.connect()
+            }
+            let onProgress: TransferProgress = { bytes, total in
                 Self.report(item, bytes: bytes, total: total)
                 return !(item?.cancelRequested ?? true)
+            }
+            if resumeFrom > 0 {
+                try await volume.download(entry, to: dest, resumingFrom: resumeFrom, progress: onProgress)
+            } else {
+                try await volume.download(entry, to: dest, progress: onProgress)
             }
             return dest
         }
@@ -111,7 +129,13 @@ final class TransferQueue: ObservableObject {
         let item = TransferItem(name: name, direction: .upload, purpose: .keep, detail: serverName)
         let attrs = try? FileManager.default.attributesOfItem(atPath: localURL.path)
         item.total = (attrs?[.size] as? Int64) ?? -1
-        work[item.id] = { [weak item] in
+        work[item.id] = { [weak item] _ in
+            if (item?.attempts ?? 0) > 0 {
+                try? await volume.connect()
+                // Uploads restart whole; clear the server's torn partial first.
+                let partial = FileEntry(name: name, path: VolumePath.join(dir, name), isDirectory: false)
+                try? await volume.delete(partial)
+            }
             try await volume.upload(localURL, toDirectory: dir, name: name) { bytes, total in
                 Self.report(item, bytes: bytes, total: total)
                 return !(item?.cancelRequested ?? true)
@@ -174,7 +198,10 @@ final class TransferQueue: ObservableObject {
 
     private func pump() {
         guard !pumping else { return }
-        guard let next = items.last(where: { $0.status == .queued }) else { return }
+        guard let next = items.last(where: { $0.status == .queued }) else {
+            onActivity?()
+            return
+        }
         guard let job = work[next.id] else {
             next.status = .failed("Lost the job")
             pump()
@@ -183,29 +210,62 @@ final class TransferQueue: ObservableObject {
         pumping = true
         next.status = .running
         let background = UIApplication.shared.beginBackgroundTask(withName: "packmule.transfer")
+        onActivity?()
         Task {
             do {
-                let dest = try await job()
+                var resumeFrom: Int64 = 0
+                if next.direction == .download, next.attempts > 0,
+                   let dest = next.plannedDestination {
+                    let attrs = try? FileManager.default.attributesOfItem(atPath: dest.path)
+                    resumeFrom = (attrs?[.size] as? Int64) ?? 0
+                }
+                let dest = try await job(resumeFrom)
                 next.destination = dest
                 next.fraction = 1
                 next.status = .done
+                work[next.id] = nil
                 ButtonHaptics.shared.tick()
                 onFinished?(next)
-            } catch is CancellationError {
-                next.status = .cancelled
-            } catch let error as VolumeError {
-                if case .cancelled = error {
-                    next.status = .cancelled
-                } else {
-                    next.status = .failed(error.localizedDescription)
-                }
             } catch {
-                next.status = .failed(error.localizedDescription)
+                if next.cancelRequested || Self.isCancel(error) {
+                    next.status = .cancelled
+                    work[next.id] = nil
+                } else if next.attempts + 1 < Self.maxAttempts, Self.isRetryable(error) {
+                    // Leave the job in place; back off briefly and requeue so the
+                    // next run picks up from the partial file's size.
+                    next.attempts += 1
+                    next.status = .queued
+                    try? await Task.sleep(nanoseconds: UInt64(next.attempts) * 2_000_000_000)
+                } else {
+                    next.status = .failed(Self.message(for: error))
+                    work[next.id] = nil
+                }
             }
-            work[next.id] = nil
             if background != .invalid { UIApplication.shared.endBackgroundTask(background) }
             pumping = false
             pump()
         }
+    }
+
+    private static func isCancel(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let volumeError = error as? VolumeError, case .cancelled = volumeError { return true }
+        return false
+    }
+
+    /// Network blips retry; wrong passwords and missing files don't.
+    private static func isRetryable(_ error: Error) -> Bool {
+        guard let volumeError = error as? VolumeError else { return true }
+        switch volumeError {
+        case .authFailed, .unsupported, .notFound, .cancelled, .badAddress:
+            return false
+        case .disconnected, .protocolFailure:
+            return true
+        }
+    }
+
+    private static func message(for error: Error) -> String {
+        let text = error.localizedDescription
+        return text.isEmpty ? "Something went wrong" : text
     }
 }

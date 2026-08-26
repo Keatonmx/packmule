@@ -239,6 +239,9 @@ def main():
         'PRODUCT_NAME': '$(TARGET_NAME)',
         'SUPPORTED_PLATFORMS': 'iphoneos iphonesimulator',
         'SUPPORTS_MACCATALYST': 'NO',
+        # SIDELOAD gates the personal server seed; App Store submissions build
+        # with: xcodebuild SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited)'
+        'SWIFT_ACTIVE_COMPILATION_CONDITIONS': ['SIDELOAD', '$(inherited)'],
         'SWIFT_EMIT_LOC_STRINGS': 'YES',
         'SWIFT_STRICT_CONCURRENCY': 'minimal',
         'VERSIONING_SYSTEM': 'apple-generic',

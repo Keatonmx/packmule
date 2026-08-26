@@ -17,6 +17,9 @@ struct AppSettings: Codable, Equatable {
     var foldersFirst = true
     var showHidden = false
 
+    // Transfers
+    var keepAwakeWhileHauling = true
+
     // Safety
     var confirmDelete = true
 }
