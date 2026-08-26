@@ -55,6 +55,10 @@
 		<string>audio</string>
 	</array>
 
+	<!-- The Dynamic Island mule. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+
 	<!-- Documents (Downloads and imports) visible and editable in the Files app. -->
 	<key>UIFileSharingEnabled</key>
 	<true/>

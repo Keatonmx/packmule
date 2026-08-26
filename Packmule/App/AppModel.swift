@@ -86,7 +86,13 @@ final class AppModel: ObservableObject {
         servers = ServerStore.load()
         ButtonHaptics.shared.enabled = settings.haptics
         transfers.onFinished = { [weak self] item in self?.transferFinished(item) }
-        transfers.onActivity = { [weak self] in self?.updateIdleTimer() }
+        transfers.onActivity = { [weak self] in
+            guard let self else { return }
+            self.updateIdleTimer()
+            if #available(iOS 16.2, *) {
+                LiveActivityManager.shared.queueChanged(self.transfers)
+            }
+        }
         #if DEBUG
         handleLaunchArguments()
         #endif

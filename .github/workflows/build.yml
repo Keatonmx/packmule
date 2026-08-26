@@ -117,6 +117,9 @@ jobs:
           # not embedded. Fail here rather than ship a broken IPA.
           test -e "$APP/Frameworks/AMSMB2.framework/AMSMB2"
           ls -la "$APP/Frameworks"
+          # The Dynamic Island widget extension must ride along too.
+          test -e "$APP/PlugIns/PackmuleWidgets.appex/PackmuleWidgets"
+          ls -la "$APP/PlugIns"
           rm -rf ipa && mkdir -p ipa/Payload
           cp -R "$APP" ipa/Payload/
           (cd ipa && zip -qry ../Packmule-unsigned.ipa Payload)

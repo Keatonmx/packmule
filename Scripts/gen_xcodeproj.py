@@ -1,26 +1,33 @@
 #!/usr/bin/env python3
-"""Generates Packmule.xcodeproj from the files under Packmule/.
+"""Generates Packmule.xcodeproj: the app target plus the PackmuleWidgets
+Live Activity extension (the Dynamic Island mule).
 
     python3 Scripts/gen_xcodeproj.py
 
-Re-run after adding or removing source files. IDs are derived from paths, so
-re-generation only changes what actually changed. Swift Package dependencies
-are declared in PACKAGES below and resolved by xcodebuild on first build.
+Re-run after adding or removing source files. IDs derive from paths, so
+re-generation only changes what actually changed. Layout:
+
+    Packmule/         app sources (also compiles Shared/)
+    Shared/           types both the app and the widget need
+    PackmuleWidgets/  the widget extension (also compiles Shared/)
 """
 import hashlib
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = 'Packmule'
+SHARED_DIR = 'Shared'
+WIDGET_DIR = 'PackmuleWidgets'
+WIDGET_NAME = 'PackmuleWidgets'
 PROJECT_NAME = 'Packmule'
 BUNDLE_ID = 'com.redfernsoutpost.packmule'
 DEPLOYMENT_TARGET = '16.0'
+WIDGET_DEPLOYMENT_TARGET = '16.2'
 
-# (display name, repository URL, (requirement kind, version), [product names], embed)
-# embed=True copies the product into the app's Frameworks/ folder — required
-# for packages whose product is declared dynamic (AMSMB2); static products
-# (Citadel) must NOT be embedded. Citadel is pinned upToNextMinor because its
-# 0.11+ releases require iOS 17 and a forked swift-nio-ssh.
+# (display name, repository URL, (requirement kind, version), [product names],
+#  embed) — embed only DYNAMIC library products (AMSMB2); static ones (Citadel)
+#  link into the binary and must not be copied. Citadel stays upToNextMinor:
+#  its 0.11+ releases require iOS 17 and a forked swift-nio-ssh.
 PACKAGES = [
     ('AMSMB2', 'https://github.com/amosavian/AMSMB2.git',
      ('upToNextMajorVersion', '3.0.0'), ['AMSMB2'], True),
@@ -54,13 +61,11 @@ def q(s):
 class Project:
     def __init__(self):
         self.objects = {}   # id -> (isa, dict-as-string)
-        self.build_files = {'sources': [], 'resources': [], 'frameworks': []}
 
     def add(self, oid, isa, body):
         self.objects[oid] = (isa, body)
         return oid
 
-    # ---- groups / files -------------------------------------------------
     def group(self, rel_path, name, children, source_tree='<group>'):
         oid = uid('namedgroup:' + name)
         kids = ' '.join(f'{c},' for c in children)
@@ -69,14 +74,9 @@ class Project:
                  f'{{isa = PBXGroup; children = ({kids}); name = {q(name)}; {path_part}sourceTree = {q(source_tree)}; }}')
         return oid
 
-    def build_file(self, phase, file_ref, rel_path):
-        oid = uid(f'buildfile:{phase}:{rel_path}')
-        self.add(oid, 'PBXBuildFile', f'{{isa = PBXBuildFile; fileRef = {file_ref}; }}')
-        self.build_files[phase].append(oid)
-        return oid
-
-    def walk(self, dir_rel):
-        """Returns the group id for dir_rel, creating groups for children."""
+    def walk(self, dir_rel, ns, sources, resources):
+        """Adds file refs + groups for dir_rel; appends build-file ids (unique
+        per `ns`, so two targets can compile the same file) into the lists."""
         abs_dir = os.path.join(ROOT, dir_rel)
         children = []
         for entry in sorted(os.listdir(abs_dir)):
@@ -85,7 +85,7 @@ class Project:
             rel = os.path.join(dir_rel, entry).replace('\\', '/')
             ext = os.path.splitext(entry)[1]
             if os.path.isdir(os.path.join(abs_dir, entry)) and ext not in FILE_TYPES:
-                children.append(self.walk(rel))
+                children.append(self.walk(rel, ns, sources, resources))
                 continue
             if ext not in FILE_TYPES:
                 continue
@@ -93,14 +93,22 @@ class Project:
             self.add(ref, 'PBXFileReference',
                      f'{{isa = PBXFileReference; lastKnownFileType = {FILE_TYPES[ext]}; path = {q(entry)}; sourceTree = "<group>"; }}')
             children.append(ref)
-            if ext in SOURCE_EXTS:
-                self.build_file('sources', ref, rel)
-            elif ext in RESOURCE_EXTS:
-                self.build_file('resources', ref, rel)
+            bucket = sources if ext in SOURCE_EXTS else (resources if ext in RESOURCE_EXTS else None)
+            if bucket is not None:
+                bf = uid(f'buildfile:{ns}:{rel}')
+                self.add(bf, 'PBXBuildFile', f'{{isa = PBXBuildFile; fileRef = {ref}; }}')
+                bucket.append(bf)
         oid = uid('group:' + dir_rel)
         kids = ' '.join(f'{c},' for c in children)
         self.add(oid, 'PBXGroup',
                  f'{{isa = PBXGroup; children = ({kids}); path = {q(os.path.basename(dir_rel))}; sourceTree = "<group>"; }}')
+        return oid
+
+    def phase(self, key, isa, files, extra=''):
+        oid = uid(key)
+        items = ' '.join(f'{f},' for f in files)
+        self.add(oid, isa,
+                 f'{{isa = {isa}; buildActionMask = 2147483647; {extra}files = ({items}); runOnlyForDeploymentPostprocessing = 0; }}')
         return oid
 
 
@@ -118,16 +126,23 @@ def build_settings(common):
 
 def main():
     p = Project()
+    project_id = uid('project')
 
-    # Sources under Packmule/
-    app_group = p.walk(SRC_DIR)
+    # ---- sources --------------------------------------------------------
+    app_sources, app_resources = [], []
+    app_group = p.walk(SRC_DIR, 'app', app_sources, app_resources)
+    shared_group = p.walk(SHARED_DIR, 'app', app_sources, app_resources)
 
-    # Swift packages. AMSMB2's product is a DYNAMIC library, so besides linking
-    # it we must copy it into the app's Frameworks/ folder; a hand-rolled
-    # pbxproj gets no auto-embedding, and without it the app dies at launch
-    # (dyld: Library not loaded @rpath/AMSMB2.framework/AMSMB2).
+    widget_sources, widget_resources = [], []
+    widget_group = p.walk(WIDGET_DIR, 'widget', widget_sources, widget_resources)
+    p.walk(SHARED_DIR, 'widget', widget_sources, widget_resources)
+
+    # ---- Swift packages (app target only) -------------------------------
+    # AMSMB2's product is a DYNAMIC library: link AND embed it, or the app
+    # dies at launch (dyld cannot find @rpath/AMSMB2.framework/AMSMB2).
     package_refs = []
     product_dep_ids = []
+    link_files = []
     embed_files = []
     for name, url, (req_kind, version), products, embed in PACKAGES:
         pkg_id = uid('pkgref:' + url)
@@ -142,7 +157,7 @@ def main():
             product_dep_ids.append(dep_id)
             bf = uid('buildfile:frameworks:' + product)
             p.add(bf, 'PBXBuildFile', f'{{isa = PBXBuildFile; productRef = {dep_id}; }}')
-            p.build_files['frameworks'].append(bf)
+            link_files.append(bf)
             if embed:
                 ebf = uid('buildfile:embed:' + product)
                 p.add(ebf, 'PBXBuildFile',
@@ -150,13 +165,16 @@ def main():
                       f'settings = {{ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }}; }}')
                 embed_files.append(ebf)
 
-    # Product
+    # ---- products -------------------------------------------------------
     app_ref = uid('product:app')
     p.add(app_ref, 'PBXFileReference',
           f'{{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = {PROJECT_NAME}.app; sourceTree = BUILT_PRODUCTS_DIR; }}')
-    products_group = p.group('', 'Products', [app_ref])
+    appex_ref = uid('product:appex')
+    p.add(appex_ref, 'PBXFileReference',
+          f'{{isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = {WIDGET_NAME}.appex; sourceTree = BUILT_PRODUCTS_DIR; }}')
+    products_group = p.group('', 'Products', [app_ref, appex_ref])
 
-    # Scripts as plain references (handy in the navigator)
+    # ---- scripts in the navigator ---------------------------------------
     script_refs = []
     for name in ['gen_xcodeproj.py', 'gen_icon.py']:
         rel = f'Scripts/{name}'
@@ -168,27 +186,28 @@ def main():
     p.add(readme_ref, 'PBXFileReference', '{isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; }')
     scripts_group = p.group('Scripts', 'Scripts', script_refs)
 
-    main_group = p.group('', PROJECT_NAME, [app_group, scripts_group, readme_ref, products_group])
+    main_group = p.group('', PROJECT_NAME,
+                         [app_group, shared_group, widget_group, scripts_group, readme_ref, products_group])
 
-    # Build phases
-    def phase(oid_key, isa, files):
-        oid = uid(oid_key)
-        items = ' '.join(f'{f},' for f in files)
-        p.add(oid, isa, f'{{isa = {isa}; buildActionMask = 2147483647; files = ({items}); runOnlyForDeploymentPostprocessing = 0; }}')
-        return oid
+    # ---- app phases -----------------------------------------------------
+    app_sources_phase = p.phase('phase:sources', 'PBXSourcesBuildPhase', app_sources)
+    app_frameworks_phase = p.phase('phase:frameworks', 'PBXFrameworksBuildPhase', link_files)
+    app_resources_phase = p.phase('phase:resources', 'PBXResourcesBuildPhase', app_resources)
+    embed_fw_phase = p.phase('phase:embed', 'PBXCopyFilesBuildPhase', embed_files,
+                             extra='dstPath = ""; dstSubfolderSpec = 10; name = "Embed Frameworks"; ')
 
-    sources_phase = phase('phase:sources', 'PBXSourcesBuildPhase', p.build_files['sources'])
-    frameworks_phase = phase('phase:frameworks', 'PBXFrameworksBuildPhase', p.build_files['frameworks'])
-    resources_phase = phase('phase:resources', 'PBXResourcesBuildPhase', p.build_files['resources'])
+    appex_bf = uid('buildfile:embedext:widgets')
+    p.add(appex_bf, 'PBXBuildFile',
+          f'{{isa = PBXBuildFile; fileRef = {appex_ref}; settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }}')
+    embed_ext_phase = p.phase('phase:embedext', 'PBXCopyFilesBuildPhase', [appex_bf],
+                              extra='dstPath = ""; dstSubfolderSpec = 13; name = "Embed Foundation Extensions"; ')
 
-    embed_items = ' '.join(f'{f},' for f in embed_files)
-    embed_phase = uid('phase:embed')
-    p.add(embed_phase, 'PBXCopyFilesBuildPhase',
-          f'{{isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; '
-          f'dstSubfolderSpec = 10; files = ({embed_items}); name = "Embed Frameworks"; '
-          f'runOnlyForDeploymentPostprocessing = 0; }}')
+    # ---- widget phases --------------------------------------------------
+    w_sources_phase = p.phase('phase:w:sources', 'PBXSourcesBuildPhase', widget_sources)
+    w_frameworks_phase = p.phase('phase:w:frameworks', 'PBXFrameworksBuildPhase', [])
+    w_resources_phase = p.phase('phase:w:resources', 'PBXResourcesBuildPhase', widget_resources)
 
-    # Build configurations
+    # ---- configurations -------------------------------------------------
     project_common = {
         'ALWAYS_SEARCH_USER_PATHS': 'NO',
         'CLANG_ANALYZER_NONNULL': 'YES',
@@ -224,18 +243,13 @@ def main():
         'SWIFT_OPTIMIZATION_LEVEL': '-O',
         'VALIDATE_PRODUCT': 'YES',
     })
-    target_common = {
-        'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
-        'ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME': 'AccentColor',
-        'CODE_SIGN_ENTITLEMENTS': f'{SRC_DIR}/Resources/{PROJECT_NAME}.entitlements',
+
+    shared_target_settings = {
         'CODE_SIGN_STYLE': 'Automatic',
         'CURRENT_PROJECT_VERSION': '1',
         'DEVELOPMENT_TEAM': '',
         'GENERATE_INFOPLIST_FILE': 'NO',
-        'INFOPLIST_FILE': f'{SRC_DIR}/Resources/Info.plist',
-        'LD_RUNPATH_SEARCH_PATHS': ['$(inherited)', '@executable_path/Frameworks'],
         'MARKETING_VERSION': '1.0',
-        'PRODUCT_BUNDLE_IDENTIFIER': BUNDLE_ID,
         'PRODUCT_NAME': '$(TARGET_NAME)',
         'SUPPORTED_PLATFORMS': 'iphoneos iphonesimulator',
         'SUPPORTS_MACCATALYST': 'NO',
@@ -246,17 +260,28 @@ def main():
         'SWIFT_STRICT_CONCURRENCY': 'minimal',
         'VERSIONING_SYSTEM': 'apple-generic',
     }
+    app_target_settings = dict(shared_target_settings, **{
+        'ASSETCATALOG_COMPILER_APPICON_NAME': 'AppIcon',
+        'ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME': 'AccentColor',
+        'CODE_SIGN_ENTITLEMENTS': f'{SRC_DIR}/Resources/{PROJECT_NAME}.entitlements',
+        'INFOPLIST_FILE': f'{SRC_DIR}/Resources/Info.plist',
+        'LD_RUNPATH_SEARCH_PATHS': ['$(inherited)', '@executable_path/Frameworks'],
+        'PRODUCT_BUNDLE_IDENTIFIER': BUNDLE_ID,
+    })
+    widget_target_settings = dict(shared_target_settings, **{
+        'INFOPLIST_FILE': f'{WIDGET_DIR}/Info.plist',
+        'IPHONEOS_DEPLOYMENT_TARGET': WIDGET_DEPLOYMENT_TARGET,
+        'LD_RUNPATH_SEARCH_PATHS': ['$(inherited)', '@executable_path/Frameworks',
+                                    '@executable_path/../../Frameworks'],
+        'PRODUCT_BUNDLE_IDENTIFIER': BUNDLE_ID + '.widgets',
+        'SKIP_INSTALL': 'YES',
+    })
 
     def config(key, name, settings):
         oid = uid(key)
         p.add(oid, 'XCBuildConfiguration',
               f'{{isa = XCBuildConfiguration; buildSettings = {{\n{build_settings(settings)}\n\t\t\t}}; name = {name}; }}')
         return oid
-
-    proj_debug = config('config:project:Debug', 'Debug', project_debug)
-    proj_release = config('config:project:Release', 'Release', project_release)
-    tgt_debug = config('config:target:Debug', 'Debug', target_common)
-    tgt_release = config('config:target:Release', 'Release', target_common)
 
     def config_list(key, configs):
         oid = uid(key)
@@ -265,25 +290,53 @@ def main():
               f'{{isa = XCConfigurationList; buildConfigurations = ({items}); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; }}')
         return oid
 
-    proj_configs = config_list('configlist:project', [proj_debug, proj_release])
-    tgt_configs = config_list('configlist:target', [tgt_debug, tgt_release])
+    proj_configs = config_list('configlist:project', [
+        config('config:project:Debug', 'Debug', project_debug),
+        config('config:project:Release', 'Release', project_release),
+    ])
+    app_configs = config_list('configlist:target', [
+        config('config:target:Debug', 'Debug', app_target_settings),
+        config('config:target:Release', 'Release', app_target_settings),
+    ])
+    widget_configs = config_list('configlist:widget', [
+        config('config:widget:Debug', 'Debug', widget_target_settings),
+        config('config:widget:Release', 'Release', widget_target_settings),
+    ])
 
-    target = uid('target:app')
+    # ---- targets --------------------------------------------------------
+    widget_target = uid('target:widget')
+    p.add(widget_target, 'PBXNativeTarget',
+          f'{{isa = PBXNativeTarget; buildConfigurationList = {widget_configs}; '
+          f'buildPhases = ({w_sources_phase}, {w_frameworks_phase}, {w_resources_phase}, ); '
+          f'buildRules = (); dependencies = (); name = {WIDGET_NAME}; productName = {WIDGET_NAME}; '
+          f'productReference = {appex_ref}; productType = "com.apple.product-type.app-extension"; }}')
+
+    proxy = uid('proxy:widget')
+    p.add(proxy, 'PBXContainerItemProxy',
+          f'{{isa = PBXContainerItemProxy; containerPortal = {project_id}; proxyType = 1; '
+          f'remoteGlobalIDString = {widget_target}; remoteInfo = {WIDGET_NAME}; }}')
+    widget_dep = uid('dep:widget')
+    p.add(widget_dep, 'PBXTargetDependency',
+          f'{{isa = PBXTargetDependency; target = {widget_target}; targetProxy = {proxy}; }}')
+
+    app_target = uid('target:app')
     product_deps = ' '.join(f'{d},' for d in product_dep_ids)
-    p.add(target, 'PBXNativeTarget',
-          f'{{isa = PBXNativeTarget; buildConfigurationList = {tgt_configs}; buildPhases = ({sources_phase}, {frameworks_phase}, {resources_phase}, {embed_phase}, ); '
-          f'buildRules = (); dependencies = (); name = {PROJECT_NAME}; packageProductDependencies = ({product_deps}); productName = {PROJECT_NAME}; '
+    p.add(app_target, 'PBXNativeTarget',
+          f'{{isa = PBXNativeTarget; buildConfigurationList = {app_configs}; '
+          f'buildPhases = ({app_sources_phase}, {app_frameworks_phase}, {app_resources_phase}, {embed_fw_phase}, {embed_ext_phase}, ); '
+          f'buildRules = (); dependencies = ({widget_dep}, ); name = {PROJECT_NAME}; '
+          f'packageProductDependencies = ({product_deps}); productName = {PROJECT_NAME}; '
           f'productReference = {app_ref}; productType = "com.apple.product-type.application"; }}')
 
-    project = uid('project')
     pkg_list = ' '.join(f'{r},' for r in package_refs)
-    p.add(project, 'PBXProject',
+    p.add(project_id, 'PBXProject',
           f'{{isa = PBXProject; attributes = {{ BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1500; LastUpgradeCheck = 1500; '
-          f'TargetAttributes = {{ {target} = {{ CreatedOnToolsVersion = 15.0; }}; }}; }}; buildConfigurationList = {proj_configs}; '
-          f'compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); '
-          f'mainGroup = {main_group}; packageReferences = ({pkg_list}); productRefGroup = {products_group}; projectDirPath = ""; projectRoot = ""; targets = ({target}, ); }}')
+          f'TargetAttributes = {{ {app_target} = {{ CreatedOnToolsVersion = 15.0; }}; {widget_target} = {{ CreatedOnToolsVersion = 15.0; }}; }}; }}; '
+          f'buildConfigurationList = {proj_configs}; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; '
+          f'knownRegions = (en, Base, ); mainGroup = {main_group}; packageReferences = ({pkg_list}); productRefGroup = {products_group}; '
+          f'projectDirPath = ""; projectRoot = ""; targets = ({app_target}, {widget_target}, ); }}')
 
-    # Emit
+    # ---- emit -----------------------------------------------------------
     out = ['// !$*UTF8*$!', '{', '\tarchiveVersion = 1;', '\tclasses = {', '\t};', '\tobjectVersion = 56;', '\tobjects = {']
     by_isa = {}
     for oid, (isa, body) in p.objects.items():
@@ -293,7 +346,7 @@ def main():
         for oid, body in sorted(by_isa[isa]):
             out.append(f'\t\t{oid} = {body};')
         out.append(f'/* End {isa} section */')
-    out += ['\t};', f'\trootObject = {project};', '}', '']
+    out += ['\t};', f'\trootObject = {project_id};', '}', '']
 
     proj_dir = os.path.join(ROOT, f'{PROJECT_NAME}.xcodeproj')
     os.makedirs(os.path.join(proj_dir, 'xcshareddata', 'xcschemes'), exist_ok=True)
@@ -305,7 +358,7 @@ def main():
    <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">
       <BuildActionEntries>
          <BuildActionEntry buildForTesting = "YES" buildForRunning = "YES" buildForProfiling = "YES" buildForArchiving = "YES" buildForAnalyzing = "YES">
-            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "{target}" BuildableName = "{PROJECT_NAME}.app" BlueprintName = "{PROJECT_NAME}" ReferencedContainer = "container:{PROJECT_NAME}.xcodeproj"/>
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "{app_target}" BuildableName = "{PROJECT_NAME}.app" BlueprintName = "{PROJECT_NAME}" ReferencedContainer = "container:{PROJECT_NAME}.xcodeproj"/>
          </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
@@ -314,12 +367,12 @@ def main():
    </TestAction>
    <LaunchAction buildConfiguration = "Debug" selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle = "0" useCustomWorkingDirectory = "NO" ignoresPersistentStateOnLaunch = "NO" debugDocumentVersioning = "YES" debugServiceExtension = "internal" allowLocationSimulation = "YES">
       <BuildableProductRunnable runnableDebuggingMode = "0">
-         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "{target}" BuildableName = "{PROJECT_NAME}.app" BlueprintName = "{PROJECT_NAME}" ReferencedContainer = "container:{PROJECT_NAME}.xcodeproj"/>
+         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "{app_target}" BuildableName = "{PROJECT_NAME}.app" BlueprintName = "{PROJECT_NAME}" ReferencedContainer = "container:{PROJECT_NAME}.xcodeproj"/>
       </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction buildConfiguration = "Release" shouldUseLaunchSchemeArgsEnv = "YES" savedToolIdentifier = "" useCustomWorkingDirectory = "NO" debugDocumentVersioning = "YES">
       <BuildableProductRunnable runnableDebuggingMode = "0">
-         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "{target}" BuildableName = "{PROJECT_NAME}.app" BlueprintName = "{PROJECT_NAME}" ReferencedContainer = "container:{PROJECT_NAME}.xcodeproj"/>
+         <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "{app_target}" BuildableName = "{PROJECT_NAME}.app" BlueprintName = "{PROJECT_NAME}" ReferencedContainer = "container:{PROJECT_NAME}.xcodeproj"/>
       </BuildableProductRunnable>
    </ProfileAction>
    <AnalyzeAction buildConfiguration = "Debug"/>
@@ -329,8 +382,8 @@ def main():
     with open(os.path.join(proj_dir, 'xcshareddata', 'xcschemes', f'{PROJECT_NAME}.xcscheme'), 'w', encoding='utf-8', newline='\n') as f:
         f.write(scheme)
 
-    n_src = len(p.build_files['sources'])
-    print(f'Wrote {proj_dir} ({n_src} source files, {len(p.build_files["resources"])} resources)')
+    print(f'Wrote {proj_dir} (app: {len(app_sources)} sources, {len(app_resources)} resources; '
+          f'widget: {len(widget_sources)} sources)')
 
 
 if __name__ == '__main__':
