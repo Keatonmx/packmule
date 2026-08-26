@@ -22,6 +22,8 @@ enum TransferPurpose {
     case preview
     /// Fetch to a temporary spot, then open the share sheet.
     case share
+    /// Fetch to a temporary spot, then open the player (FTP can't seek).
+    case play
 }
 
 enum TransferStatus: Equatable {

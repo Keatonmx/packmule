@@ -289,6 +289,9 @@ struct FileRow: View {
             .buttonStyle(RowPressStyle())
             .contextMenu {
                 if !entry.isDirectory {
+                    if model.volume is JellyfinVolume || MediaFile.isStreamable(entry.name) {
+                        Button { model.play(entry) } label: { Label("Play", systemImage: "play.fill") }
+                    }
                     if !(model.volume?.isLocal ?? false) {
                         Button { model.download(entry) } label: { Label("Download", systemImage: "arrow.down.circle") }
                     }

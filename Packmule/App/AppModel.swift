@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 import Network
 
 enum Screen: Equatable {
@@ -61,6 +62,8 @@ final class AppModel: ObservableObject {
     @Published var shareURL: URL?
     @Published var showingImporter = false
     @Published var showingFolderPicker = false
+    /// Non-nil while the full screen player is up.
+    @Published var playerRequest: PlayerRequest?
 
     @Published var linkedFolders: [LinkedFolder] = LinkedFolderStore.load()
 
@@ -197,6 +200,10 @@ final class AppModel: ObservableObject {
         case .sftp:
             return SFTPVolume(host: server.host, port: server.port,
                               username: server.username, password: password)
+        case .jellyfin:
+            return JellyfinVolume(host: server.host, port: server.port,
+                                  https: server.https ?? false,
+                                  username: server.username, password: password)
         }
     }
 
@@ -469,6 +476,51 @@ final class AppModel: ObservableObject {
             if let url = item.destination { quickLookURL = url }
         case .share:
             if let url = item.destination { shareURL = url }
+        case .play:
+            if let url = item.destination {
+                playerRequest = PlayerRequest(title: item.name, url: url)
+            }
+        }
+    }
+
+    // MARK: - Playback
+
+    func play(_ entry: FileEntry) {
+        guard let volume else { return }
+        openSheet(nil)
+        if let jellyfin = volume as? JellyfinVolume {
+            if let url = jellyfin.playbackURL(for: entry) {
+                playerRequest = PlayerRequest(title: entry.name, url: url)
+            } else {
+                showToast("Jellyfin wouldn't stream that item")
+            }
+            return
+        }
+        if let local = volume.localURL(for: entry) {
+            playerRequest = PlayerRequest(title: entry.name, url: local)
+            return
+        }
+        let title = entry.name
+        Task {
+            do {
+                if let url = try await MediaStreamer.shared.makeURL(entry: entry, volume: volume) {
+                    playerRequest = PlayerRequest(title: title, url: url)
+                } else {
+                    // Plain FTP can't seek; fetch a copy and play that.
+                    transfers.enqueueDownload(volume: volume, entry: entry,
+                                              from: browserTitle, purpose: .play)
+                    showToast("FTP can't seek: fetching a copy to play")
+                }
+            } catch {
+                showToast(Self.friendly(error))
+            }
+        }
+    }
+
+    func playerClosed() {
+        MediaStreamer.shared.clearTarget()
+        if !ftpServer.running {
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 

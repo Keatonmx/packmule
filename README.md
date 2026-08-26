@@ -19,6 +19,11 @@ back to you.
   MLSD with LIST fallback). Anonymous or signed in.
 - **SFTP** — file transfer over SSH via Citadel (password auth), for Linux
   boxes, VPSes and anything with sshd.
+- **Jellyfin** — sign in with your Jellyfin account, browse libraries, and
+  stream. Unsupported containers (MKV) are transcoded by the server to HLS.
+- **Streaming player** — movies and music on SMB/SFTP shares play in place
+  through a loopback range-request bridge (no download first), in a custom
+  player: scrubbing, skip, speed, audio/subtitle tracks, AirPlay, PiP.
 - **Hosting** — a built-in FTP server serving the app's folder. Windows
   Explorer opens `ftp://<phone-ip>:2121` straight from the address bar.
   Optional sign-in; runs while the app is open.

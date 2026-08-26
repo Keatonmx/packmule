@@ -298,6 +298,7 @@ struct ServerRow: View {
         case .smb: return "externaldrive.fill"
         case .ftp: return "arrow.up.arrow.down"
         case .sftp: return "terminal.fill"
+        case .jellyfin: return "play.rectangle.fill"
         }
     }
 }

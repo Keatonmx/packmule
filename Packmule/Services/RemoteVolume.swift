@@ -53,10 +53,22 @@ protocol RemoteVolume: AnyObject {
 
     /// The on-disk URL for an entry, when the volume is the phone itself.
     func localURL(for entry: FileEntry) -> URL?
+
+    /// Seekable byte access for media streaming; nil when the volume can't
+    /// seek (plain FTP). Each caller gets its own reader and must close it.
+    func reader(for entry: FileEntry) async throws -> RandomAccessReader?
+}
+
+/// A seekable byte source feeding the in-app streaming bridge.
+protocol RandomAccessReader: AnyObject {
+    var size: Int64 { get }
+    func read(offset: Int64, length: Int) async throws -> Data
+    func close() async
 }
 
 extension RemoteVolume {
     var isLocal: Bool { false }
     var isReadOnly: Bool { false }
     func localURL(for entry: FileEntry) -> URL? { nil }
+    func reader(for entry: FileEntry) async throws -> RandomAccessReader? { nil }
 }

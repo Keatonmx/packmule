@@ -174,6 +174,66 @@ final class SFTPVolume: RemoteVolume {
         sftp = nil
         ssh = nil
     }
+
+    /// Streaming gets its own SSH connection so browsing stays responsive.
+    func reader(for entry: FileEntry) async throws -> RandomAccessReader? {
+        let client = try await SSHClient.connect(
+            host: host,
+            port: port,
+            authenticationMethod: .passwordBased(username: username, password: password),
+            hostKeyValidator: .acceptAnything(),
+            reconnect: .never)
+        do {
+            let sftp = try await client.openSFTP()
+            let file = try await sftp.openFile(filePath: entry.path, flags: .read)
+            let attrs = try? await file.readAttributes()
+            let size = (attrs?.size).map { Int64(clamping: $0) } ?? entry.size ?? -1
+            guard size >= 0 else {
+                try? await file.close()
+                try? await sftp.close()
+                try? await client.close()
+                return nil
+            }
+            return SFTPRandomReader(ssh: client, sftp: sftp, file: file, size: size)
+        } catch {
+            try? await client.close()
+            throw error
+        }
+    }
+}
+
+final class SFTPRandomReader: RandomAccessReader {
+    private let ssh: SSHClient
+    private let sftp: SFTPClient
+    private let file: SFTPFile
+    let size: Int64
+
+    init(ssh: SSHClient, sftp: SFTPClient, file: SFTPFile, size: Int64) {
+        self.ssh = ssh
+        self.sftp = sftp
+        self.file = file
+        self.size = size
+    }
+
+    func read(offset: Int64, length: Int) async throws -> Data {
+        guard offset < size, length > 0 else { return Data() }
+        var collected = Data()
+        // The server caps a single SFTP read, so accumulate short reads.
+        while collected.count < length {
+            let want = UInt32(clamping: length - collected.count)
+            let buffer = try await file.read(from: UInt64(offset) + UInt64(collected.count),
+                                             length: min(want, 256 * 1024))
+            if buffer.readableBytes == 0 { break }
+            collected.append(Data(buffer.readableBytesView))
+        }
+        return collected
+    }
+
+    func close() async {
+        try? await file.close()
+        try? await sftp.close()
+        try? await ssh.close()
+    }
 }
 
 /// Tiny polling mutex for whole operations (actors alone are reentrant).

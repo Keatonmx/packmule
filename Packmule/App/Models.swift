@@ -13,6 +13,7 @@ enum ServerKind: String, Codable, CaseIterable, Identifiable {
     case smb = "SMB"
     case ftp = "FTP"
     case sftp = "SFTP"
+    case jellyfin = "Jellyfin"
     var id: String { rawValue }
 
     var defaultPort: Int {
@@ -20,6 +21,7 @@ enum ServerKind: String, Codable, CaseIterable, Identifiable {
         case .smb: return 445
         case .ftp: return 21
         case .sftp: return 22
+        case .jellyfin: return 8096
         }
     }
 
@@ -28,6 +30,7 @@ enum ServerKind: String, Codable, CaseIterable, Identifiable {
         case .smb: return "smb"
         case .ftp: return "ftp"
         case .sftp: return "sftp"
+        case .jellyfin: return "http"
         }
     }
 }
@@ -47,14 +50,18 @@ struct SavedServer: Codable, Equatable, Identifiable {
     /// Empty means guest (SMB) or anonymous (FTP). Passwords live in the Keychain.
     var username: String = ""
     var lastConnected: Date? = nil
+    /// Jellyfin behind a reverse proxy; optional so older saves still decode.
+    var https: Bool? = nil
 
     var displayName: String { name.isEmpty ? host : name }
 
     var addressLine: String {
-        var s = "\(kind.scheme)://\(host)"
+        var scheme = kind.scheme
+        if kind == .jellyfin, https == true { scheme = "https" }
+        var s = "\(scheme)://\(host)"
         if let port, port != kind.defaultPort { s += ":\(port)" }
         if kind == .smb, !share.isEmpty { s += "/\(share)" }
-        if kind != .smb, startPath != "/", !startPath.isEmpty { s += startPath }
+        if kind == .ftp || kind == .sftp, startPath != "/", !startPath.isEmpty { s += startPath }
         return s
     }
 }
@@ -95,6 +102,40 @@ enum BrowseSort: String, Codable, CaseIterable, Identifiable {
     case size = "Size"
     case date = "Date"
     var id: String { rawValue }
+}
+
+// MARK: - Media
+
+/// What the Apple player engine can and cannot open.
+enum MediaFile {
+    static let video: Set<String> = ["mp4", "m4v", "mov", "3gp"]
+    static let audio: Set<String> = ["mp3", "m4a", "aac", "wav", "flac", "aiff", "aif", "caf"]
+    /// Containers that need a transcoding server (Jellyfin) or the FFmpeg engine.
+    static let engineOnly: Set<String> = ["mkv", "avi", "wmv", "flv", "webm", "ts", "m2ts", "ogv", "ogg", "divx"]
+
+    static func ext(_ name: String) -> String {
+        (name as NSString).pathExtension.lowercased()
+    }
+
+    static func isStreamable(_ name: String) -> Bool {
+        let e = ext(name)
+        return video.contains(e) || audio.contains(e)
+    }
+
+    static func isAudio(_ name: String) -> Bool {
+        audio.contains(ext(name))
+    }
+
+    static func needsEngine(_ name: String) -> Bool {
+        engineOnly.contains(ext(name))
+    }
+}
+
+/// One request to open the full screen player.
+struct PlayerRequest: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let url: URL
 }
 
 // MARK: - Paths

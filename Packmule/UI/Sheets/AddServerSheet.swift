@@ -39,11 +39,13 @@ struct AddServerSheet: View {
 
     var body: some View {
         BottomSheet(maxHeightFraction: 0.92, onDismiss: { model.openSheet(nil) }) {
-            SheetHeader(title: isEdit ? "Edit server" : "Add server") {
-                SegmentedPill(options: ServerKind.allCases, label: { $0.rawValue }, selection: $kind)
-            }
+            SheetHeader(title: isEdit ? "Edit server" : "Add server") { EmptyView() }
             HuggingScrollView {
                 VStack(spacing: 14) {
+                    SegmentedPill(options: ServerKind.allCases, label: { $0.rawValue },
+                                  selection: $kind, fontSize: 12, horizontalPadding: 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                     LabeledField(label: "Name", placeholder: "Home media", text: $name, autocapitalize: true)
 
                     HStack(alignment: .bottom, spacing: 10) {
@@ -57,7 +59,7 @@ struct AddServerSheet: View {
                     if kind == .smb {
                         LabeledField(label: "Share", placeholder: "media, or empty to browse shares",
                                      text: $share, keyboard: .URL)
-                    } else {
+                    } else if kind == .ftp || kind == .sftp {
                         LabeledField(label: "Start in", placeholder: "/", text: $startPath, keyboard: .URL)
                     }
 
@@ -68,7 +70,9 @@ struct AddServerSheet: View {
                                  text: $password, secure: true)
                         .onChange(of: password) { _ in passwordTouched = true }
 
-                    Text("Any address this phone can reach works: home network, or a VPN tunnel like WireGuard. If the packets get there, the mule can too.")
+                    Text(kind == .jellyfin
+                         ? "Sign in with your Jellyfin account, the same one the web app uses. Formats this phone can't play are converted by the server, so MKV works here. Paste an https address if yours sits behind a reverse proxy."
+                         : "Any address this phone can reach works: home network, or a VPN tunnel like WireGuard. If the packets get there, the mule can too.")
                         .font(Typography.meta13)
                         .foregroundColor(Palette.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,6 +113,7 @@ struct AddServerSheet: View {
         case .smb: return "guest"
         case .ftp: return "anonymous"
         case .sftp: return "pi, keaton, root…"
+        case .jellyfin: return "your Jellyfin user"
         }
     }
 
@@ -130,6 +135,11 @@ struct AddServerSheet: View {
         guard !rawHost.isEmpty else {
             model.showToast("A host is required")
             return nil
+        }
+        if rawHost.lowercased().hasPrefix("https://") {
+            server.https = true
+        } else if rawHost.lowercased().hasPrefix("http://") {
+            server.https = false
         }
         if let schemeRange = rawHost.range(of: "://") {
             rawHost = String(rawHost[schemeRange.upperBound...])
@@ -163,6 +173,10 @@ struct AddServerSheet: View {
         server.username = username.trimmingCharacters(in: .whitespaces)
         if kind == .sftp, server.username.isEmpty {
             model.showToast("SFTP needs a user name")
+            return nil
+        }
+        if kind == .jellyfin, server.username.isEmpty {
+            model.showToast("Jellyfin needs your user name")
             return nil
         }
         return server

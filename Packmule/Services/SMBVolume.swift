@@ -150,4 +150,42 @@ final class SMBVolume: RemoteVolume {
         connectedShare = nil
         client = nil
     }
+
+    func reader(for entry: FileEntry) async throws -> RandomAccessReader? {
+        let (share, rel) = try target(entry.path)
+        try await ensureShare(share)
+        let client = try requireClient()
+        var size = entry.size ?? -1
+        if size < 0 {
+            let attrs = try await client.attributesOfItem(atPath: rel)
+            size = (attrs[.fileSizeKey] as? Int64)
+                ?? (attrs[.fileSizeKey] as? NSNumber)?.int64Value
+                ?? -1
+        }
+        guard size >= 0 else { return nil }
+        return SMBRandomReader(client: client, path: rel, size: size)
+    }
+}
+
+/// Ranged reads straight off the share; each call is an independent
+/// open + read, which libsmb2 handles happily at streaming chunk sizes.
+final class SMBRandomReader: RandomAccessReader {
+    private let client: SMB2Manager
+    private let path: String
+    let size: Int64
+
+    init(client: SMB2Manager, path: String, size: Int64) {
+        self.client = client
+        self.path = path
+        self.size = size
+    }
+
+    func read(offset: Int64, length: Int) async throws -> Data {
+        guard offset < size, length > 0 else { return Data() }
+        let start = UInt64(offset)
+        let end = min(start + UInt64(length), UInt64(size))
+        return try await client.contents(atPath: path, range: start..<end, progress: nil)
+    }
+
+    func close() async {}
 }

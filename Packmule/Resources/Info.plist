@@ -39,6 +39,22 @@
 		<string>_sftp-ssh._tcp</string>
 	</array>
 
+	<!-- Home media servers (Jellyfin, DLNA) and the in-app streaming bridge on
+	     127.0.0.1 speak plain http; ATS would silently block both. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+
+	<!-- Keep audio running when the player is backgrounded or in PiP. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+
 	<!-- Documents (Downloads and imports) visible and editable in the Files app. -->
 	<key>UIFileSharingEnabled</key>
 	<true/>

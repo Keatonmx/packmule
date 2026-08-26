@@ -71,6 +71,11 @@ struct RootView: View {
         .sheet(item: shareBinding) { item in
             ShareSheet(items: [item.url]).ignoresSafeArea()
         }
+        .fullScreenCover(item: $model.playerRequest) { request in
+            PlayerView(request: request)
+                .environmentObject(model)
+                .environment(\.theme, model.theme)
+        }
     }
 
     @ViewBuilder

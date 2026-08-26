@@ -15,6 +15,19 @@ struct FileActionsSheet: View {
 
     private var isRemote: Bool { !(model.volume?.isLocal ?? true) }
 
+    /// Jellyfin plays everything (the server transcodes); elsewhere only what
+    /// the Apple engine opens.
+    private var canPlay: Bool {
+        if model.volume is JellyfinVolume { return true }
+        return MediaFile.isStreamable(entry.name)
+    }
+
+    private var playSubtitle: String? {
+        if model.volume is JellyfinVolume { return "Streams now, the server converts if needed" }
+        if isRemote { return "Streams without downloading" }
+        return nil
+    }
+
     var body: some View {
         BottomSheet(onDismiss: { model.openSheet(nil) }) {
             HStack(spacing: 12) {
@@ -47,6 +60,14 @@ struct FileActionsSheet: View {
                         model.open(entry)
                     }
                 } else {
+                    if canPlay {
+                        NavRow(title: "Play", subtitle: playSubtitle, showsChevron: false) {
+                            model.play(entry)
+                        }
+                    } else if MediaFile.needsEngine(entry.name) {
+                        SettingsRow(title: "Can't play this container yet",
+                                    subtitle: "MKV and friends play through a Jellyfin server today. The FFmpeg engine that plays them straight off the share is coming.") { EmptyView() }
+                    }
                     if isRemote {
                         NavRow(title: "Download", subtitle: "To Downloads, visible in the Files app",
                                showsChevron: false) {
@@ -63,7 +84,7 @@ struct FileActionsSheet: View {
                 }
                 if model.volume?.isReadOnly ?? false {
                     SettingsRow(title: "Read only",
-                                subtitle: "Photos can be copied out but never changed here",
+                                subtitle: "This library can be copied from, never changed from here",
                                 showsSeparator: false) { EmptyView() }
                 } else {
                     NavRow(title: "Rename", showsChevron: false) {
