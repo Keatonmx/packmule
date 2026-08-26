@@ -1,0 +1,59 @@
+//
+//  RemoteVolume.swift
+//  Packmule
+//
+//  One protocol for every place files live: an SMB share, an FTP server, the
+//  phone's own Documents folder, or the demo data CI screenshots use. The
+//  browser never knows which one it is talking to.
+//
+
+import Foundation
+
+enum VolumeError: LocalizedError {
+    case badAddress
+    case cancelled
+    case disconnected
+    case authFailed
+    case notFound(String)
+    case unsupported(String)
+    case protocolFailure(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .badAddress: return "That address doesn't look right"
+        case .cancelled: return "Cancelled"
+        case .disconnected: return "The server closed the connection"
+        case .authFailed: return "Sign-in failed. Check the user and password"
+        case .notFound(let name): return "Not found: \(name)"
+        case .unsupported(let what): return "Not supported here: \(what)"
+        case .protocolFailure(let detail): return detail
+        }
+    }
+}
+
+/// Progress callback: (bytes so far, total bytes or -1). Return false to cancel.
+typealias TransferProgress = (Int64, Int64) -> Bool
+
+protocol RemoteVolume: AnyObject {
+    /// "SMB", "FTP", "This iPhone"; shown as the browser's little kind badge.
+    var kindLabel: String { get }
+    /// Local volumes preview and share in place instead of downloading first.
+    var isLocal: Bool { get }
+
+    func connect() async throws
+    func list(_ path: String) async throws -> [FileEntry]
+    func download(_ entry: FileEntry, to url: URL, progress: @escaping TransferProgress) async throws
+    func upload(_ localURL: URL, toDirectory dir: String, name: String, progress: @escaping TransferProgress) async throws
+    func delete(_ entry: FileEntry) async throws
+    func createFolder(named name: String, in dir: String) async throws
+    func rename(_ entry: FileEntry, to newName: String) async throws
+    func disconnect() async
+
+    /// The on-disk URL for an entry, when the volume is the phone itself.
+    func localURL(for entry: FileEntry) -> URL?
+}
+
+extension RemoteVolume {
+    var isLocal: Bool { false }
+    func localURL(for entry: FileEntry) -> URL? { nil }
+}

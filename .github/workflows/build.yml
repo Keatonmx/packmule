@@ -1,0 +1,155 @@
+name: Build Packmule
+
+# Runs on GitHub's free macOS runners — the Mac you don't have.
+#   • compiles the app for the iOS Simulator and for devices
+#   • boots a simulator, launches Packmule in demo mode, takes screenshots
+#   • uploads an UNSIGNED .ipa you can sign + install from Windows with Sideloadly
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # for the rolling "latest" release
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      SCHEME: Packmule
+      BUNDLE_ID: com.redfernsoutpost.packmule
+      DERIVED: ${{ github.workspace }}/DerivedData
+      SPM_CACHE: ${{ github.workspace }}/SourcePackages
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          xcodebuild -version
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SPM_CACHE }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Packmule.xcodeproj/project.pbxproj') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Packmule.xcodeproj -scheme "$SCHEME" -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED" \
+            -clonedSourcePackagesDirPath "$SPM_CACHE" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee xcodebuild-simulator.log | (grep -E "error:|BUILD " || true)
+          test -x "$DERIVED/Build/Products/Debug-iphonesimulator/Packmule.app/Packmule"
+
+      - name: Simulator smoke test + screenshots
+        continue-on-error: true
+        run: |
+          APP="$DERIVED/Build/Products/Debug-iphonesimulator/Packmule.app"
+          UDID=$(xcrun simctl list devices available -j | jq -r '
+            .devices | to_entries[] | select(.key | contains("iOS")) | .value[]
+            | select(.name | test("^iPhone (16|15) Pro$")) | .udid' | head -n 1)
+          if [ -z "$UDID" ]; then
+            UDID=$(xcrun simctl list devices available -j | jq -r '
+              .devices | to_entries[] | select(.key | contains("iOS")) | .value[]
+              | select(.name | test("^iPhone")) | .udid' | head -n 1)
+          fi
+          echo "Simulator: $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p screenshots
+
+          # shot <name> [launch args…]: relaunch with the Debug-only arguments,
+          # wait for the screen to settle, capture.
+          shot() {
+            local name="$1"; shift
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+            xcrun simctl launch "$UDID" "$BUNDLE_ID" "$@" > "screenshots/launch-$name.log" 2>&1
+            sleep "${SHOT_DELAY:-6}"
+            xcrun simctl io "$UDID" screenshot "screenshots/$name.png"
+          }
+
+          shot 01-home -packmule-demo
+          shot 02-browser -packmule-demo -packmule-browse
+          shot 03-add-server -packmule-demo -packmule-sheet addServer
+          shot 04-transfers -packmule-demo -packmule-transfers -packmule-sheet transfers
+          shot 05-home-hauling -packmule-demo -packmule-transfers
+          shot 06-file-actions -packmule-demo -packmule-browse -packmule-sheet fileActions
+          shot 07-server-actions -packmule-demo -packmule-sheet serverActions
+          shot 08-settings -packmule-demo -packmule-sheet settings
+          shot 09-about -packmule-demo -packmule-sheet about
+          shot 10-new-folder -packmule-demo -packmule-browse -packmule-sheet newFolder
+          shot 11-home-midnight -packmule-demo -packmule-theme Midnight
+          shot 12-browser-ember -packmule-demo -packmule-browse -packmule-theme Ember
+          shot 13-home-fresh
+
+          xcrun simctl spawn "$UDID" log show --last 120s --predicate 'process == "Packmule"' > screenshots/device.log 2>/dev/null || true
+          xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true
+
+      - name: Build for device (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Packmule.xcodeproj -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$DERIVED" \
+            -clonedSourcePackagesDirPath "$SPM_CACHE" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee xcodebuild-device.log | (grep -E "error:|BUILD " || true)
+          APP="$DERIVED/Build/Products/Release-iphoneos/Packmule.app"
+          test -x "$APP/Packmule"
+          rm -rf ipa && mkdir -p ipa/Payload
+          cp -R "$APP" ipa/Payload/
+          (cd ipa && zip -qry ../Packmule-unsigned.ipa Payload)
+          ls -la Packmule-unsigned.ipa
+
+      - name: Upload IPA (sign with Sideloadly on Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Packmule-unsigned-ipa
+          path: Packmule-unsigned.ipa
+          retention-days: 30
+
+      - name: Publish rolling "latest" release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp Packmule-unsigned.ipa "Packmule-unsigned-build${{ github.run_number }}.ipa"
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest "Packmule-unsigned-build${{ github.run_number }}.ipa" \
+            --title "Latest build (#${{ github.run_number }})" \
+            --notes "Unsigned IPA from ${{ github.sha }}. Sign and install with Sideloadly." \
+            --latest
+
+      - name: Upload simulator screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            xcodebuild-simulator.log
+            xcodebuild-device.log
+          if-no-files-found: ignore
