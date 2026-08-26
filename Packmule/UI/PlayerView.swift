@@ -569,6 +569,13 @@ struct PlayerView: View {
         }
     }
 
+    private func speedLabel(_ speed: Double) -> String {
+        if speed == speed.rounded() {
+            return "\(Int(speed))×"
+        }
+        return "\(speed)×"
+    }
+
     private func timeString(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
         let total = Int(seconds)
