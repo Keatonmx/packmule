@@ -42,10 +42,10 @@ struct HomeView: View {
                     SectionHeader(title: "This iPhone")
                     Card {
                         NavRow(title: "Browse this iPhone",
-                               subtitle: "Downloads land here, visible in the Files app",
-                               showsSeparator: false) {
+                               subtitle: "Downloads land here, visible in the Files app") {
                             model.openLocal()
                         }
+                        HostRow()
                     }
 
                     if !transfers.items.isEmpty, transfers.activeCount == 0 {
@@ -149,6 +149,42 @@ struct HomeView: View {
 
 // MARK: - Rows
 
+/// "Host this iPhone" row with a live green dot while the server runs.
+struct HostRow: View {
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var server: FTPServer
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                ButtonHaptics.shared.tap()
+                model.openSheet(.host)
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Host this iPhone").font(Typography.row).foregroundColor(.white)
+                        Text(server.running
+                             ? "Serving on port \(server.config.port). Keep the app open"
+                             : "Let other devices connect here over FTP")
+                            .font(Typography.rowSubtitle)
+                            .foregroundColor(Palette.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if server.running {
+                        Circle().fill(Color(hex: 0x58CC52)).frame(width: 8, height: 8)
+                    }
+                    RowChevron()
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 54)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowPressStyle())
+        }
+    }
+}
+
 struct ServerRow: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.theme) private var theme
@@ -167,7 +203,7 @@ struct ServerRow: View {
                     HStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.tint)
-                            Image(systemName: server.kind == .smb ? "externaldrive.fill" : "arrow.up.arrow.down")
+                            Image(systemName: Self.icon(for: server.kind))
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(theme.accentText)
                         }
@@ -223,6 +259,14 @@ struct ServerRow: View {
             return "\(server.addressLine) · \(when.relativeShortString)"
         }
         return server.addressLine
+    }
+
+    static func icon(for kind: ServerKind) -> String {
+        switch kind {
+        case .smb: return "externaldrive.fill"
+        case .ftp: return "arrow.up.arrow.down"
+        case .sftp: return "terminal.fill"
+        }
     }
 }
 

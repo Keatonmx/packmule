@@ -16,9 +16,16 @@ PROJECT_NAME = 'Packmule'
 BUNDLE_ID = 'com.redfernsoutpost.packmule'
 DEPLOYMENT_TARGET = '16.0'
 
-# (display name, repository URL, minimum version, [product names])
+# (display name, repository URL, (requirement kind, version), [product names], embed)
+# embed=True copies the product into the app's Frameworks/ folder — required
+# for packages whose product is declared dynamic (AMSMB2); static products
+# (Citadel) must NOT be embedded. Citadel is pinned upToNextMinor because its
+# 0.11+ releases require iOS 17 and a forked swift-nio-ssh.
 PACKAGES = [
-    ('AMSMB2', 'https://github.com/amosavian/AMSMB2.git', '3.0.0', ['AMSMB2']),
+    ('AMSMB2', 'https://github.com/amosavian/AMSMB2.git',
+     ('upToNextMajorVersion', '3.0.0'), ['AMSMB2'], True),
+    ('Citadel', 'https://github.com/orlandos-nl/Citadel.git',
+     ('upToNextMinorVersion', '0.10.1'), ['Citadel'], False),
 ]
 
 FILE_TYPES = {
@@ -122,11 +129,11 @@ def main():
     package_refs = []
     product_dep_ids = []
     embed_files = []
-    for name, url, version, products in PACKAGES:
+    for name, url, (req_kind, version), products, embed in PACKAGES:
         pkg_id = uid('pkgref:' + url)
         p.add(pkg_id, 'XCRemoteSwiftPackageReference',
               f'{{isa = XCRemoteSwiftPackageReference; repositoryURL = {q(url)}; '
-              f'requirement = {{kind = upToNextMajorVersion; minimumVersion = {version}; }}; }}')
+              f'requirement = {{kind = {req_kind}; minimumVersion = {version}; }}; }}')
         package_refs.append(pkg_id)
         for product in products:
             dep_id = uid('pkgproduct:' + url + ':' + product)
@@ -136,11 +143,12 @@ def main():
             bf = uid('buildfile:frameworks:' + product)
             p.add(bf, 'PBXBuildFile', f'{{isa = PBXBuildFile; productRef = {dep_id}; }}')
             p.build_files['frameworks'].append(bf)
-            ebf = uid('buildfile:embed:' + product)
-            p.add(ebf, 'PBXBuildFile',
-                  f'{{isa = PBXBuildFile; productRef = {dep_id}; '
-                  f'settings = {{ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }}; }}')
-            embed_files.append(ebf)
+            if embed:
+                ebf = uid('buildfile:embed:' + product)
+                p.add(ebf, 'PBXBuildFile',
+                      f'{{isa = PBXBuildFile; productRef = {dep_id}; '
+                      f'settings = {{ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }}; }}')
+                embed_files.append(ebf)
 
     # Product
     app_ref = uid('product:app')

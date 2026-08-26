@@ -96,6 +96,7 @@ jobs:
           shot 11-home-midnight -packmule-demo -packmule-theme Midnight
           shot 12-browser-ember -packmule-demo -packmule-browse -packmule-theme Ember
           shot 13-home-fresh
+          shot 14-host -packmule-demo -packmule-sheet host
 
           xcrun simctl spawn "$UDID" log show --last 120s --predicate 'process == "Packmule"' > screenshots/device.log 2>/dev/null || true
           xcrun simctl terminate "$UDID" "$BUNDLE_ID" || true

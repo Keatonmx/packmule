@@ -61,7 +61,7 @@ struct AddServerSheet: View {
                         LabeledField(label: "Start in", placeholder: "/", text: $startPath, keyboard: .URL)
                     }
 
-                    LabeledField(label: "User", placeholder: kind == .smb ? "guest" : "anonymous",
+                    LabeledField(label: "User", placeholder: userPlaceholder,
                                  text: $username, keyboard: .emailAddress)
                     LabeledField(label: "Password",
                                  placeholder: isEdit ? "Unchanged" : "Optional",
@@ -101,6 +101,14 @@ struct AddServerSheet: View {
                 }
                 .padding(.bottom, 4)
             }
+        }
+    }
+
+    private var userPlaceholder: String {
+        switch kind {
+        case .smb: return "guest"
+        case .ftp: return "anonymous"
+        case .sftp: return "pi, keaton, root…"
         }
     }
 
@@ -153,6 +161,10 @@ struct AddServerSheet: View {
         let start = startPath.trimmingCharacters(in: .whitespaces)
         server.startPath = start.isEmpty ? "/" : (start.hasPrefix("/") ? start : "/" + start)
         server.username = username.trimmingCharacters(in: .whitespaces)
+        if kind == .sftp, server.username.isEmpty {
+            model.showToast("SFTP needs a user name")
+            return nil
+        }
         return server
     }
 }

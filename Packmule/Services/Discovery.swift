@@ -24,6 +24,7 @@ final class Discovery: ObservableObject {
         guard browsers.isEmpty else { return }
         browse(type: "_smb._tcp", kind: .smb)
         browse(type: "_ftp._tcp", kind: .ftp)
+        browse(type: "_sftp-ssh._tcp", kind: .sftp)
     }
 
     func stop() {

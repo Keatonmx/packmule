@@ -32,6 +32,7 @@
 	<array>
 		<string>_smb._tcp</string>
 		<string>_ftp._tcp</string>
+		<string>_sftp-ssh._tcp</string>
 	</array>
 
 	<!-- Documents (Downloads and imports) visible and editable in the Files app. -->

@@ -1,9 +1,10 @@
 # Packmule
 
 A free file mule for iOS, by Redfern's Outpost. It hauls files between your
-phone and anything that speaks **SMB** or **FTP**: a Windows share like
-`\\10.0.0.253\media`, a NAS, a Raspberry Pi, another phone running an FTP
-server.
+phone and anything that speaks **SMB**, **FTP** or **SFTP**: a Windows share
+like `\\10.0.0.253\media`, a NAS, a Linux box over SSH, another phone running
+an FTP server. It can also **host**: start the built-in FTP server and other
+devices connect to the phone.
 
 **Free means free.** SMB, FTP, uploads, downloads: all of it. There is no Pro
 tier, no subscription, no unlock. A file app should not ransom your own files
@@ -16,6 +17,11 @@ back to you.
   Pasting a Windows path (`\\10.0.0.253\media`) into the Host field just works.
 - **FTP** — a from-scratch client on Apple's Network framework (passive mode,
   MLSD with LIST fallback). Anonymous or signed in.
+- **SFTP** — file transfer over SSH via Citadel (password auth), for Linux
+  boxes, VPSes and anything with sshd.
+- **Hosting** — a built-in FTP server serving the app's folder. Windows
+  Explorer opens `ftp://<phone-ip>:2121` straight from the address bar.
+  Optional sign-in; runs while the app is open.
 - **VPN friendly** — on WireGuard or Tailscale, use the tunnel address and go.
   Packmule doesn't care how the packets get there.
 - **Nearby** — Bonjour discovery lists SMB/FTP servers advertising on the LAN.
@@ -51,13 +57,14 @@ The app icon is rendered by `python3 Scripts/gen_icon.py` (stdlib only).
 - `-packmule-demo` — seeded servers and nearby devices, nothing persisted
 - `-packmule-browse` — open a fake media-share listing
 - `-packmule-transfers` — seed the transfer queue
-- `-packmule-sheet addServer|serverActions|fileActions|transfers|settings|about|newFolder`
+- `-packmule-sheet addServer|serverActions|fileActions|transfers|settings|about|newFolder|host`
 - `-packmule-theme Mule|Modern|Tin|Midnight|Forest|Ember|Mint|Grape|Sakura`
 
 ## Credits
 
 - [AMSMB2](https://github.com/amosavian/AMSMB2) (MIT) and
   [libsmb2](https://github.com/sahlberg/libsmb2) (LGPL-2.1) for SMB.
-- The FTP engine is Packmule's own.
+- [Citadel](https://github.com/orlandos-nl/Citadel) (MIT) for SSH/SFTP.
+- The FTP client and server are Packmule's own.
 
 Packmule's source is MIT licensed.

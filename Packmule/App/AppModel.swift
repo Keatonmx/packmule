@@ -25,6 +25,7 @@ enum ActiveSheet: Equatable {
     case transfers
     case settings
     case about
+    case host
 }
 
 @MainActor
@@ -68,6 +69,7 @@ final class AppModel: ObservableObject {
 
     let transfers = TransferQueue()
     let discovery = Discovery()
+    let ftpServer = FTPServer()
 
     var theme: ThemeTokens { .tokens(for: settings.theme) }
 
@@ -165,7 +167,7 @@ final class AppModel: ObservableObject {
                     servers[idx].lastConnected = Date()
                     persistServers()
                 }
-                let start = server.kind == .ftp ? Self.normalized(server.startPath) : "/"
+                let start = server.kind == .smb ? "/" : Self.normalized(server.startPath)
                 enterBrowser(at: start)
             } catch {
                 showToast(Self.friendly(error))
@@ -189,6 +191,9 @@ final class AppModel: ObservableObject {
         case .ftp:
             return FTPVolume(host: server.host, port: server.port,
                              username: server.username, password: password)
+        case .sftp:
+            return SFTPVolume(host: server.host, port: server.port,
+                              username: server.username, password: password)
         }
     }
 
@@ -478,6 +483,7 @@ final class AppModel: ObservableObject {
                 case "settings": self.activeSheet = .settings
                 case "about": self.activeSheet = .about
                 case "newFolder": self.activeSheet = .newFolder
+                case "host": self.activeSheet = .host
                 default: break
                 }
             }

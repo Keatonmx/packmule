@@ -15,6 +15,7 @@ struct PackmuleApp: App {
                 .environmentObject(model)
                 .environmentObject(model.transfers)
                 .environmentObject(model.discovery)
+                .environmentObject(model.ftpServer)
                 .environment(\.theme, model.theme)
                 .preferredColorScheme(.dark)
         }
@@ -96,6 +97,8 @@ struct RootView: View {
                     SettingsSheet()
                 case .about:
                     AboutSheet()
+                case .host:
+                    HostSheet()
                 }
             }
         }

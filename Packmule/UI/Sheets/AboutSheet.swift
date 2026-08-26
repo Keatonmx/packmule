@@ -56,7 +56,10 @@ struct AboutSheet: View {
                         credit(name: "libsmb2", licence: "LGPL-2.1",
                                note: "The SMB core underneath, by Ronnie Sahlberg and contributors.",
                                url: "https://github.com/sahlberg/libsmb2", showsSeparator: true)
-                        credit(name: "FTP engine", licence: "This app",
+                        credit(name: "Citadel", licence: "MIT",
+                               note: "SSH and SFTP by Joannis Orlandos, on Apple's SwiftNIO SSH.",
+                               url: "https://github.com/orlandos-nl/Citadel", showsSeparator: true)
+                        credit(name: "FTP client & server", licence: "This app",
                                note: "Written for Packmule on Apple's Network framework. That's why it's free.",
                                url: AppInfo.sourceURL, showsSeparator: false)
                     }

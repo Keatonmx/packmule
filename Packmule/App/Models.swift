@@ -12,12 +12,14 @@ import Foundation
 enum ServerKind: String, Codable, CaseIterable, Identifiable {
     case smb = "SMB"
     case ftp = "FTP"
+    case sftp = "SFTP"
     var id: String { rawValue }
 
     var defaultPort: Int {
         switch self {
         case .smb: return 445
         case .ftp: return 21
+        case .sftp: return 22
         }
     }
 
@@ -25,6 +27,7 @@ enum ServerKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .smb: return "smb"
         case .ftp: return "ftp"
+        case .sftp: return "sftp"
         }
     }
 }
@@ -51,7 +54,7 @@ struct SavedServer: Codable, Equatable, Identifiable {
         var s = "\(kind.scheme)://\(host)"
         if let port, port != kind.defaultPort { s += ":\(port)" }
         if kind == .smb, !share.isEmpty { s += "/\(share)" }
-        if kind == .ftp, startPath != "/", !startPath.isEmpty { s += startPath }
+        if kind != .smb, startPath != "/", !startPath.isEmpty { s += startPath }
         return s
     }
 }
