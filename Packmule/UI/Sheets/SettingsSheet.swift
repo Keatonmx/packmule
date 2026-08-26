@@ -11,22 +11,28 @@ import UIKit
 struct SettingsSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.theme) private var theme
+    /// Nine theme rows are a lot of sheet; closed until asked for.
+    @State private var appearanceCollapsed = true
 
     var body: some View {
         BottomSheet(maxHeightFraction: 0.88, onDismiss: { model.openSheet(nil) }) {
             SheetHeader(title: "Settings") { EmptyView() }
             HuggingScrollView {
                 VStack(spacing: 0) {
-                    SectionHeader(title: "Appearance")
-                    Card {
-                        ForEach(Array(ThemeName.allCases.enumerated()), id: \.element.id) { index, name in
-                            ThemeRow(name: name, showsSeparator: index < ThemeName.allCases.count - 1)
+                    CollapsibleSection(title: "Appearance",
+                                       collapsed: appearanceCollapsed,
+                                       collapsedDetail: model.settings.theme.rawValue,
+                                       onToggle: { appearanceCollapsed.toggle() }) {
+                        Card {
+                            ForEach(Array(ThemeName.allCases.enumerated()), id: \.element.id) { index, name in
+                                ThemeRow(name: name, showsSeparator: index < ThemeName.allCases.count - 1)
+                            }
                         }
-                    }
-                    Card {
-                        SettingsRow(title: "Haptics", subtitle: "A little tap on every button",
-                                    showsSeparator: false) {
-                            MuleToggle(isOn: $model.settings.haptics)
+                        Card {
+                            SettingsRow(title: "Haptics", subtitle: "A little tap on every button",
+                                        showsSeparator: false) {
+                                MuleToggle(isOn: $model.settings.haptics)
+                            }
                         }
                     }
 
@@ -36,7 +42,8 @@ struct SettingsSheet: View {
                             SegmentedPill(options: BrowseSort.allCases, label: { $0.rawValue },
                                           selection: $model.settings.sort)
                         }
-                        SettingsRow(title: "Folders first") {
+                        SettingsRow(title: "Folders first",
+                                    subtitle: "Folders sit above files in every listing, whatever the sort") {
                             MuleToggle(isOn: $model.settings.foldersFirst)
                         }
                         SettingsRow(title: "Hidden files", subtitle: "Names starting with a dot",
