@@ -34,7 +34,7 @@ struct ServerActionsSheet: View {
                     model.openSheet(nil)
                     model.connect(server)
                 }
-                NavRow(title: "Edit", subtitle: "Address, share, sign-in") {
+                NavRow(title: "Edit", subtitle: "Address, share, password") {
                     model.openSheet(.addServer(server, isEdit: true))
                 }
                 NavRow(title: "Copy address", detail: server.addressLine, showsChevron: false) {

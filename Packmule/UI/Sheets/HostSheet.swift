@@ -50,7 +50,7 @@ struct HostSheet: View {
                             }
                             if addressLines.isEmpty {
                                 SettingsRow(title: "No network address found",
-                                            subtitle: "Join Wi-Fi or turn the VPN on, then start again",
+                                            subtitle: "Join WiFi or turn the VPN on, then start again",
                                             showsSeparator: false) { EmptyView() }
                             }
                         }
@@ -60,12 +60,12 @@ struct HostSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         HStack(alignment: .bottom, spacing: 10) {
-                            LabeledField(label: "User", placeholder: "Empty means no sign-in", text: $username)
+                            LabeledField(label: "User", placeholder: "Empty means anyone may connect", text: $username)
                             LabeledField(label: "Port", placeholder: "2121", text: $port, keyboard: .numberPad)
                                 .frame(width: 92)
                         }
                         LabeledField(label: "Password", placeholder: "Optional", text: $password, secure: true)
-                        Text("Serves the Packmule folder (the one in the Files app) to your network. Anyone with the address\(usernameHint) can browse it, so home networks and VPNs only. iOS pauses servers in the background: keep Packmule open while hosting.")
+                        Text("Serves the Packmule folder (the one in the Files app) and your linked folders to your network. Anyone with the address\(usernameHint) can browse them, so home networks and VPNs only. iOS pauses servers in the background: keep Packmule open while hosting.")
                             .font(Typography.meta13)
                             .foregroundColor(Palette.textTertiary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,7 +111,7 @@ struct HostSheet: View {
     }
 
     private var usernameHint: String {
-        server.config.username.isEmpty ? "" : " and sign-in"
+        server.config.username.isEmpty ? "" : " and password"
     }
 
     private var addressLines: [(label: String, address: String)] {

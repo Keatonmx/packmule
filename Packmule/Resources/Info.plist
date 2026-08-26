@@ -28,6 +28,10 @@
 	     and Bonjour browsing must declare the service types it looks for. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Packmule talks to the file servers you add over your local network or VPN. Nothing leaves the network you point it at.</string>
+
+	<!-- Requested only when the user opens Photos inside the app. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Packmule shows your photo library so you can browse it and copy photos and videos to your computer or a server. It only reads: nothing is edited, deleted or uploaded anywhere on its own.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_smb._tcp</string>

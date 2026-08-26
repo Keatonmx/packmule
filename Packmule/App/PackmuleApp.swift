@@ -60,6 +60,11 @@ struct RootView: View {
                            onCancel: { model.showingImporter = false })
                 .ignoresSafeArea()
         }
+        .sheet(isPresented: $model.showingFolderPicker) {
+            FolderPicker(onPick: { model.handlePickedFolder($0) },
+                         onCancel: { model.showingFolderPicker = false })
+                .ignoresSafeArea()
+        }
         .sheet(item: quickLookBinding) { item in
             QuickLookPreview(url: item.url).ignoresSafeArea()
         }

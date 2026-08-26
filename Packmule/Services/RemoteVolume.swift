@@ -23,7 +23,7 @@ enum VolumeError: LocalizedError {
         case .badAddress: return "That address doesn't look right"
         case .cancelled: return "Cancelled"
         case .disconnected: return "The server closed the connection"
-        case .authFailed: return "Sign-in failed. Check the user and password"
+        case .authFailed: return "The server rejected the user or password"
         case .notFound(let name): return "Not found: \(name)"
         case .unsupported(let what): return "Not supported here: \(what)"
         case .protocolFailure(let detail): return detail
@@ -39,6 +39,8 @@ protocol RemoteVolume: AnyObject {
     var kindLabel: String { get }
     /// Local volumes preview and share in place instead of downloading first.
     var isLocal: Bool { get }
+    /// Read-only volumes (Photos) hide upload, rename, delete and new folder.
+    var isReadOnly: Bool { get }
 
     func connect() async throws
     func list(_ path: String) async throws -> [FileEntry]
@@ -55,5 +57,6 @@ protocol RemoteVolume: AnyObject {
 
 extension RemoteVolume {
     var isLocal: Bool { false }
+    var isReadOnly: Bool { false }
     func localURL(for entry: FileEntry) -> URL? { nil }
 }

@@ -44,12 +44,28 @@ enum LocalFiles {
 }
 
 final class LocalVolume: RemoteVolume {
-    let kindLabel = "Local"
+    let kindLabel: String
     var isLocal: Bool { true }
-    private let root = LocalFiles.documentsURL
+    private let root: URL
+    /// Linked folders come from Files-picker bookmarks and need the security
+    /// scope held open while we browse them.
+    private let securityScoped: Bool
+    private var scopeActive = false
+
+    init(root: URL = LocalFiles.documentsURL, securityScoped: Bool = false, kindLabel: String = "Local") {
+        self.root = root
+        self.securityScoped = securityScoped
+        self.kindLabel = kindLabel
+    }
 
     func connect() async throws {
-        _ = LocalFiles.downloadsURL   // make sure it exists so the root isn't empty
+        if securityScoped {
+            guard root.startAccessingSecurityScopedResource() else {
+                throw VolumeError.protocolFailure("Lost access to that folder. Unlink it, then link it again from Files")
+            }
+            scopeActive = true
+        }
+        _ = LocalFiles.downloadsURL   // make sure it exists so the app root isn't empty
     }
 
     private func url(for path: String) -> URL {
@@ -101,7 +117,12 @@ final class LocalVolume: RemoteVolume {
         try FileManager.default.moveItem(at: from, to: to)
     }
 
-    func disconnect() async {}
+    func disconnect() async {
+        if scopeActive {
+            root.stopAccessingSecurityScopedResource()
+            scopeActive = false
+        }
+    }
 
     func localURL(for entry: FileEntry) -> URL? { url(for: entry.path) }
 }

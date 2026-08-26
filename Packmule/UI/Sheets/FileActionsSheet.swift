@@ -61,12 +61,18 @@ struct FileActionsSheet: View {
                         model.share(entry)
                     }
                 }
-                NavRow(title: "Rename", showsChevron: false) {
-                    model.openSheet(.rename(entry))
-                }
-                NavRow(title: "Delete", titleColor: Palette.destructive,
-                       showsSeparator: false, showsChevron: false) {
-                    model.requestDelete(entry)
+                if model.volume?.isReadOnly ?? false {
+                    SettingsRow(title: "Read only",
+                                subtitle: "Photos can be copied out but never changed here",
+                                showsSeparator: false) { EmptyView() }
+                } else {
+                    NavRow(title: "Rename", showsChevron: false) {
+                        model.openSheet(.rename(entry))
+                    }
+                    NavRow(title: "Delete", titleColor: Palette.destructive,
+                           showsSeparator: false, showsChevron: false) {
+                        model.requestDelete(entry)
+                    }
                 }
             }
         }

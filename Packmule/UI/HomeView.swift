@@ -45,7 +45,19 @@ struct HomeView: View {
                                subtitle: "Downloads land here, visible in the Files app") {
                             model.openLocal()
                         }
-                        HostRow()
+                        NavRow(title: "Photos",
+                               subtitle: "Read only. Asks for photo access once, used only to show your library and copy items out of it") {
+                            model.openPhotos()
+                        }
+                        HostRow(showsSeparator: true)
+                        ForEach(model.linkedFolders) { folder in
+                            LinkedFolderRow(folder: folder)
+                        }
+                        NavRow(title: "Link a folder",
+                               subtitle: "Optional: iOS keeps every app inside its own folder. Linking folders from Files lets Packmule browse and host them too",
+                               showsSeparator: false, showsChevron: false) {
+                            model.showingFolderPicker = true
+                        }
                     }
 
                     if !transfers.items.isEmpty, transfers.activeCount == 0 {
@@ -108,7 +120,7 @@ struct HomeView: View {
                 Text("No servers yet")
                     .font(Typography.cardTitle)
                     .foregroundColor(Palette.text55)
-                Text("Add your NAS, your PC, another phone: anything that speaks SMB or FTP. On a VPN like WireGuard, just use the tunnel address.")
+                Text("Add your NAS, your PC, another phone: anything that speaks SMB, FTP or SFTP. On a VPN like WireGuard, just use the tunnel address.")
                     .font(Typography.meta13)
                     .foregroundColor(Palette.textTertiary)
                     .multilineTextAlignment(.center)
@@ -149,11 +161,30 @@ struct HomeView: View {
 
 // MARK: - Rows
 
+/// A folder linked from the Files app; hold to unlink.
+struct LinkedFolderRow: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.theme) private var theme
+    let folder: LinkedFolder
+
+    var body: some View {
+        NavRow(title: folder.name,
+               subtitle: "Linked folder, served while hosting. Hold to unlink") {
+            model.openLinked(folder)
+        }
+        .contextMenu {
+            Button { model.openLinked(folder) } label: { Label("Open", systemImage: "folder") }
+            Button(role: .destructive) { model.unlink(folder) } label: { Label("Unlink", systemImage: "minus.circle") }
+        }
+    }
+}
+
 /// "Host this iPhone" row with a live green dot while the server runs.
 struct HostRow: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var server: FTPServer
     @Environment(\.theme) private var theme
+    var showsSeparator = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -181,6 +212,7 @@ struct HostRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(RowPressStyle())
+            if showsSeparator { RowSeparator() }
         }
     }
 }

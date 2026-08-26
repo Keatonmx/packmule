@@ -60,6 +60,9 @@ final class AppModel: ObservableObject {
     @Published var quickLookURL: URL?
     @Published var shareURL: URL?
     @Published var showingImporter = false
+    @Published var showingFolderPicker = false
+
+    @Published var linkedFolders: [LinkedFolder] = LinkedFolderStore.load()
 
     private(set) var volume: (any RemoteVolume)?
     private var rawEntries: [FileEntry] = []
@@ -206,6 +209,73 @@ final class AppModel: ObservableObject {
             browserKind = volume.kindLabel
             enterBrowser(at: "/")
         }
+    }
+
+    func openPhotos() {
+        let volume = PhotosVolume()
+        Task {
+            do {
+                try await volume.connect()
+            } catch {
+                showToast(Self.friendly(error))
+                return
+            }
+            self.volume = volume
+            browserTitle = "Photos"
+            browserKind = volume.kindLabel
+            enterBrowser(at: "/")
+        }
+    }
+
+    // MARK: - Linked folders
+
+    func openLinked(_ folder: LinkedFolder) {
+        guard let url = LinkedFolderStore.resolve(folder) else {
+            showToast("Lost access. Unlink it, then link it again")
+            return
+        }
+        let volume = LocalVolume(root: url, securityScoped: true, kindLabel: "Linked")
+        Task {
+            do {
+                try await volume.connect()
+            } catch {
+                showToast(Self.friendly(error))
+                return
+            }
+            self.volume = volume
+            browserTitle = folder.name
+            browserKind = volume.kindLabel
+            enterBrowser(at: "/")
+        }
+    }
+
+    func handlePickedFolder(_ url: URL) {
+        showingFolderPicker = false
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let bookmark = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil,
+                                                   relativeTo: nil) else {
+            showToast("Couldn't keep access to that folder")
+            return
+        }
+        // Names double as FTP mount names, so keep them unique.
+        let base = url.lastPathComponent.isEmpty ? "Folder" : url.lastPathComponent
+        let existing = Set(linkedFolders.map(\.name))
+        var name = base
+        var counter = 2
+        while existing.contains(name) {
+            name = "\(base) \(counter)"
+            counter += 1
+        }
+        linkedFolders.append(LinkedFolder(name: name, bookmark: bookmark))
+        LinkedFolderStore.save(linkedFolders)
+        showToast("Linked \(name)")
+    }
+
+    func unlink(_ folder: LinkedFolder) {
+        linkedFolders.removeAll { $0.id == folder.id }
+        LinkedFolderStore.save(linkedFolders)
+        showToast("Unlinked \(folder.name)")
     }
 
     private func enterBrowser(at start: String) {

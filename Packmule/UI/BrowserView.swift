@@ -68,17 +68,21 @@ struct BrowserView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            CircleIconButton(action: { model.showingImporter = true }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Palette.text70)
+            if !(model.volume?.isReadOnly ?? false) {
+                CircleIconButton(action: { model.showingImporter = true }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(Palette.text70)
+                }
             }
 
             Menu {
-                Button {
-                    model.openSheet(.newFolder)
-                } label: {
-                    Label("New folder", systemImage: "folder.badge.plus")
+                if !(model.volume?.isReadOnly ?? false) {
+                    Button {
+                        model.openSheet(.newFolder)
+                    } label: {
+                        Label("New folder", systemImage: "folder.badge.plus")
+                    }
                 }
                 Button {
                     model.refresh()
@@ -183,7 +187,7 @@ struct BrowserView: View {
                 Text(model.searchText.isEmpty ? "Nothing in this folder" : "No files match")
                     .font(Typography.cardTitle)
                     .foregroundColor(Palette.text55)
-                if model.searchText.isEmpty {
+                if model.searchText.isEmpty, !(model.volume?.isReadOnly ?? false) {
                     Text("Tap + to send files here from this phone.")
                         .font(Typography.meta13)
                         .foregroundColor(Palette.textTertiary)
@@ -291,8 +295,10 @@ struct FileRow: View {
                     Button { model.preview(entry) } label: { Label("Preview", systemImage: "eye") }
                     Button { model.share(entry) } label: { Label("Share", systemImage: "square.and.arrow.up") }
                 }
-                Button { model.openSheet(.rename(entry)) } label: { Label("Rename", systemImage: "pencil") }
-                Button(role: .destructive) { model.requestDelete(entry) } label: { Label("Delete", systemImage: "trash") }
+                if !(model.volume?.isReadOnly ?? false) {
+                    Button { model.openSheet(.rename(entry)) } label: { Label("Rename", systemImage: "pencil") }
+                    Button(role: .destructive) { model.requestDelete(entry) } label: { Label("Delete", systemImage: "trash") }
+                }
             }
             if showsSeparator { RowSeparator().padding(.leading, 60) }
         }

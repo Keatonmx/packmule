@@ -48,6 +48,8 @@ final class FTPServer: ObservableObject {
     private var listener: NWListener?
     private var sessions: [FTPServerSession] = []
     private let queue = DispatchQueue(label: "com.redfernsoutpost.packmule.ftpserver")
+    /// Linked-folder security scopes held open while serving.
+    private var scopedURLs: [URL] = []
 
     var root: URL { LocalFiles.documentsURL }
 
@@ -59,6 +61,14 @@ final class FTPServer: ObservableObject {
             lastError = "That port doesn't work"
             return
         }
+        // Linked folders ride along as folders at the server root.
+        var mounts: [(name: String, url: URL)] = []
+        for folder in LinkedFolderStore.load() {
+            guard let url = LinkedFolderStore.resolve(folder), url.startAccessingSecurityScopedResource() else { continue }
+            scopedURLs.append(url)
+            mounts.append((folder.name, url))
+        }
+        let sessionMounts = mounts
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         do {
@@ -66,7 +76,7 @@ final class FTPServer: ObservableObject {
             // Advertise over Bonjour so other Packmules list it under Nearby.
             listener.service = NWListener.Service(name: UIDevice.current.name, type: "_ftp._tcp")
             listener.newConnectionHandler = { [weak self] connection in
-                self?.queue.async { self?.accept(connection) }
+                self?.queue.async { self?.accept(connection, mounts: sessionMounts) }
             }
             listener.stateUpdateHandler = { [weak self] state in
                 Task { @MainActor [weak self] in
@@ -88,6 +98,8 @@ final class FTPServer: ObservableObject {
             UIApplication.shared.isIdleTimerDisabled = true
         } catch {
             lastError = "Couldn't open port \(config.port): \(error.localizedDescription)"
+            scopedURLs.forEach { $0.stopAccessingSecurityScopedResource() }
+            scopedURLs = []
         }
     }
 
@@ -100,13 +112,16 @@ final class FTPServer: ObservableObject {
         connectionCount = 0
         running = false
         UIApplication.shared.isIdleTimerDisabled = false
+        scopedURLs.forEach { $0.stopAccessingSecurityScopedResource() }
+        scopedURLs = []
     }
 
     /// Called on `queue`.
-    private nonisolated func accept(_ connection: NWConnection) {
+    private nonisolated func accept(_ connection: NWConnection, mounts: [(name: String, url: URL)]) {
         let session = FTPServerSession(connection: connection,
                                        root: LocalFiles.documentsURL,
                                        config: HostConfig.load(),
+                                       mounts: mounts,
                                        queue: queue) { [weak self] session in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -140,7 +155,7 @@ final class FTPServer: ObservableObject {
                            nil, 0, NI_NUMERICHOST) == 0 {
                 let ip = String(cString: host)
                 if !ip.hasPrefix("127.") && !ip.hasPrefix("169.254.") {
-                    result.append((name.hasPrefix("utun") ? "VPN" : "Wi-Fi", ip))
+                    result.append((name.hasPrefix("utun") ? "VPN" : "WiFi", ip))
                 }
             }
         }
@@ -155,6 +170,8 @@ final class FTPServerSession {
     private let control: NWConnection
     private let root: URL
     private let config: HostConfig
+    /// Linked folders shown as folders at "/" (name, real location).
+    private let mounts: [(name: String, url: URL)]
     private let queue: DispatchQueue
     private let onClose: (FTPServerSession) -> Void
 
@@ -168,10 +185,12 @@ final class FTPServerSession {
     private var closed = false
 
     init(connection: NWConnection, root: URL, config: HostConfig,
+         mounts: [(name: String, url: URL)],
          queue: DispatchQueue, onClose: @escaping (FTPServerSession) -> Void) {
         self.control = connection
         self.root = root
         self.config = config
+        self.mounts = mounts
         self.queue = queue
         self.onClose = onClose
     }
@@ -397,8 +416,14 @@ final class FTPServerSession {
     }
 
     private func fileURL(_ virtual: String) -> URL {
+        let comps = VolumePath.components(virtual)
+        if let first = comps.first, let mount = mounts.first(where: { $0.name == first }) {
+            var url = mount.url
+            for comp in comps.dropFirst() { url.appendPathComponent(comp) }
+            return url
+        }
         var url = root
-        for comp in VolumePath.components(virtual) { url.appendPathComponent(comp) }
+        for comp in comps { url.appendPathComponent(comp) }
         return url
     }
 
@@ -513,6 +538,20 @@ final class FTPServerSession {
             at: url, includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey],
             options: [])) ?? []
         var lines: [String] = []
+        // Linked folders appear at the root next to the real contents.
+        if target == "/" {
+            for mount in mounts {
+                switch verb {
+                case "NLST":
+                    lines.append(mount.name)
+                case "MLSD":
+                    lines.append("type=dir;modify=\(Self.mlsdFormatter.string(from: Date()));size=0; \(mount.name)")
+                default:
+                    let stamp = Self.listFormatter.string(from: Date())
+                    lines.append("drwxr-xr-x 1 mule mule 0 \(stamp) \(mount.name)")
+                }
+            }
+        }
         for item in items {
             let values = try? item.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey])
             let isDir = values?.isDirectory ?? false
