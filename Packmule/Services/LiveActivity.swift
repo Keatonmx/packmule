@@ -44,8 +44,8 @@ final class LiveActivityManager {
             content: ActivityContent(state: makeState(queue), staleDate: staleDate))
         timer?.invalidate()
         let ticker = Timer(timeInterval: 1.0, repeats: true) { [weak self, weak queue] _ in
+            guard let self, let queue else { return }
             Task { @MainActor in
-                guard let self, let queue else { return }
                 self.push(queue)
             }
         }
