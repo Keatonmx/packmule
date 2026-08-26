@@ -31,7 +31,7 @@ struct HostConfig: Codable, Equatable {
 
     func save() {
         if let data = try? JSONEncoder().encode(self) {
-            UserDefaults.standard.set(data, forKey: key)
+            UserDefaults.standard.set(data, forKey: Self.key)
         }
     }
 }
