@@ -421,9 +421,32 @@ final class FTPServerSession {
                 pending(connection)
             }
         }
-        listener.start(queue: queue)
+        // The system hands out the ephemeral port only once the listener is
+        // ready; replying earlier would tell the client to dial port 0.
+        listener.stateUpdateHandler = { [weak self] state in
+            guard let self, listener === self.dataListener else { return }
+            switch state {
+            case .ready:
+                self.announcePassive(listener: listener, extended: extended)
+            case .failed:
+                self.tearDownData()
+                self.reply("425 Can't open a data port")
+            default:
+                break
+            }
+        }
         dataListener = listener
-        let port = listener.port?.rawValue ?? 0
+        listener.start(queue: queue)
+    }
+
+    /// Runs on `queue` once the data listener knows its port.
+    private func announcePassive(listener: NWListener, extended: Bool) {
+        let port = Int(listener.port?.rawValue ?? 0)
+        guard port > 0 else {
+            tearDownData()
+            reply("425 Can't open a data port")
+            return
+        }
         if extended {
             reply("229 Entering Extended Passive Mode (|||\(port)|)")
         } else if case let .hostPort(host, _)? = control.currentPath?.localEndpoint,
@@ -431,7 +454,8 @@ final class FTPServerSession {
             let quad = "\(address)".split(separator: "%")[0].replacingOccurrences(of: ".", with: ",")
             reply("227 Entering Passive Mode (\(quad),\(port / 256),\(port % 256))")
         } else {
-            reply("425 Use EPSV")
+            // No IPv4 on the control path; the extended reply names just the port.
+            reply("229 Entering Extended Passive Mode (|||\(port)|)")
         }
     }
 
