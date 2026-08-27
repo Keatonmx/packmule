@@ -712,6 +712,15 @@ final class AppModel: ObservableObject {
             }
         }
         let message = error.localizedDescription
+        // libsmb2 reports NT status codes; translate the two everyone hits.
+        let lower = message.lowercased()
+        if lower.contains("0xc0000022") || lower.contains("access_denied")
+            || lower.contains("0xc000006d") || lower.contains("logon_failure") {
+            return "The server refused the sign in. Guest may be disabled: set the user and password (hold the card, Edit). Server said: \(message)"
+        }
+        if lower.contains("0xc00000cc") || lower.contains("bad_network_name") {
+            return "The server has no share by that name. Server said: \(message)"
+        }
         return message.isEmpty ? "Something went wrong" : message
     }
 

@@ -248,8 +248,10 @@ struct ServerRow: View {
                         .frame(width: 44, height: 44)
                         .overlay(alignment: .bottomTrailing) {
                             if let alive = model.reachable[server.id] {
+                                // Status colours, not theme colours: green is
+                                // up and red is down in every theme.
                                 Circle()
-                                    .fill(alive ? theme.accent : Palette.text40.opacity(0.5))
+                                    .fill(alive ? Color(hex: 0x58CC52) : Palette.destructive)
                                     .frame(width: 8, height: 8)
                                     .overlay(Circle().stroke(theme.card, lineWidth: 2))
                                     .offset(x: 2, y: 2)

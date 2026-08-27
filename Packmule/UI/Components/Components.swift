@@ -505,19 +505,25 @@ struct SleepingMule: View {
     private let zMap = ["zzz", ".z.", "zzz"]
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.7)) { context in
-            let phase = Int(context.date.timeIntervalSinceReferenceDate / 0.7) % 2 == 0
-            VStack(alignment: .trailing, spacing: 1) {
-                HStack(alignment: .bottom, spacing: 3) {
+        VStack(alignment: .trailing, spacing: 1) {
+            // Fixed-size patch of sky: the Zs drift by OFFSET only, so the
+            // mule and anything below him never shift.
+            TimelineView(.periodic(from: .now, by: 0.7)) { context in
+                let phase = Int(context.date.timeIntervalSinceReferenceDate / 0.7) % 2 == 0
+                ZStack(alignment: .bottomTrailing) {
+                    Color.clear
                     PixelSprite(map: zMap, palette: ["z": Palette.textQuaternary])
-                        .frame(height: phase ? 5 : 7)
+                        .frame(height: 5)
+                        .offset(x: -13, y: phase ? -6 : -3)
                     PixelSprite(map: zMap, palette: ["z": Palette.text40])
-                        .frame(height: phase ? 9 : 6)
+                        .frame(height: 7)
+                        .offset(x: 0, y: phase ? -1 : -5)
                 }
-                .padding(.trailing, height * 0.14)
-                PixelSprite(map: MuleSprites.resting, palette: MuleSprites.palette)
-                    .frame(height: height)
             }
+            .frame(width: height * 0.65, height: 14)
+            .padding(.trailing, height * 0.1)
+            PixelSprite(map: MuleSprites.resting, palette: MuleSprites.palette)
+                .frame(height: height)
         }
     }
 }
@@ -572,7 +578,8 @@ struct ToastView: View {
         Text(message)
             .font(.system(size: 14, weight: .semibold))
             .foregroundColor(.white)
-            .lineLimit(1)
+            .multilineTextAlignment(.center)
+            .lineLimit(3)
             .padding(.horizontal, 18)
             .padding(.vertical, 10)
             .background(Palette.toast)
