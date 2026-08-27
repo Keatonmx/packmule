@@ -215,13 +215,9 @@ struct BrowserView: View {
             .padding(.horizontal, 16)
         } else if model.visibleEntries.isEmpty {
             VStack(spacing: 10) {
-                ZStack {
-                    theme.chip
-                    StripedPlaceholder(stripe: theme.stripe2, period: 20, width: 8)
-                }
-                .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                Text(model.searchText.isEmpty ? "Nothing in this folder" : "No files match")
+                RestingMule(height: 54)
+                    .opacity(0.9)
+                Text(model.searchText.isEmpty ? "Nothing to haul here" : "No files match")
                     .font(Typography.cardTitle)
                     .foregroundColor(Palette.text55)
                 if model.searchText.isEmpty, !(model.volume?.isReadOnly ?? false) {
@@ -249,8 +245,7 @@ struct BrowserView: View {
             model.openSheet(.transfers)
         } label: {
             HStack(spacing: 10) {
-                ProgressView()
-                    .tint(theme.accentText)
+                WalkingMule(height: 24)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(transfers.runningItem?.name ?? "Queued")
                         .font(Typography.detailSemibold)
@@ -305,7 +300,8 @@ struct FileRow: View {
                             .fill(entry.isDirectory ? theme.tint : theme.well)
                         Image(systemName: FileGlyph.symbol(for: entry))
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(entry.isDirectory ? theme.accentText : Palette.text55)
+                            .foregroundColor(entry.isDirectory ? theme.accentText
+                                             : (FileGlyph.tint(for: entry) ?? Palette.text55))
                     }
                     .frame(width: 36, height: 36)
 

@@ -36,7 +36,8 @@ struct FileActionsSheet: View {
                         .fill(entry.isDirectory ? theme.tint : theme.well)
                     Image(systemName: FileGlyph.symbol(for: entry))
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(entry.isDirectory ? theme.accentText : Palette.text70)
+                        .foregroundColor(entry.isDirectory ? theme.accentText
+                                         : (FileGlyph.tint(for: entry) ?? Palette.text70))
                 }
                 .frame(width: 46, height: 46)
                 VStack(alignment: .leading, spacing: 2) {

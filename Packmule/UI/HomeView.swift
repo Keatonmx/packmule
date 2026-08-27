@@ -115,9 +115,8 @@ struct HomeView: View {
         let servers = model.sortedServers
         if servers.isEmpty {
             VStack(spacing: 12) {
-                Image(systemName: "externaldrive.badge.questionmark")
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundColor(Palette.text40)
+                RestingMule(height: 60)
+                    .opacity(0.9)
                 Text("No servers yet")
                     .font(Typography.cardTitle)
                     .foregroundColor(Palette.text55)
@@ -364,13 +363,8 @@ struct ActiveTransfersCard: View {
             model.openSheet(.transfers)
         } label: {
             HStack(spacing: 14) {
-                ZStack {
-                    Circle().fill(theme.accent)
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 40, height: 40)
+                WalkingMule(height: 30)
+                    .frame(width: 46)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(transfers.runningItem?.name ?? "Waiting to start")

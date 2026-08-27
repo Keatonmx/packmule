@@ -477,6 +477,28 @@ struct SettingsGlyph: View {
     }
 }
 
+/// The pixel mule walking in place, for transfer bars and cards.
+struct WalkingMule: View {
+    var height: CGFloat = 22
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.32)) { context in
+            let step = Int(context.date.timeIntervalSinceReferenceDate / 0.32) % 2 == 0
+            PixelSprite(map: step ? MuleSprites.walkA : MuleSprites.walkB,
+                        palette: MuleSprites.palette)
+        }
+        .frame(height: height)
+    }
+}
+
+/// The pixel mule off duty, for empty states.
+struct RestingMule: View {
+    var height: CGFloat = 56
+    var body: some View {
+        PixelSprite(map: MuleSprites.resting, palette: MuleSprites.palette)
+            .frame(height: height)
+    }
+}
+
 /// SF Symbol + colour for a file, picked by extension.
 enum FileGlyph {
     static func symbol(for entry: FileEntry) -> String {
@@ -492,6 +514,22 @@ enum FileGlyph {
         case "gba", "gb", "gbc", "nes", "sfc", "smc", "n64", "z64", "nds", "3ds", "cia": return "gamecontroller.fill"
         case "exe", "msi", "apk", "ipa", "app", "deb", "rpm": return "shippingbox.fill"
         default: return "doc.fill"
+        }
+    }
+
+    /// Muted category hue so listings scan by colour; nil = the neutral grey.
+    static func tint(for entry: FileEntry) -> Color? {
+        guard !entry.isDirectory else { return nil }
+        switch symbol(for: entry) {
+        case "film.fill": return Color(rgba: 232, 143, 122, 1)
+        case "music.note": return Color(rgba: 115, 202, 166, 1)
+        case "photo.fill": return Color(rgba: 122, 173, 230, 1)
+        case "archivebox.fill": return Color(rgba: 217, 184, 102, 1)
+        case "book.fill": return Color(rgba: 204, 158, 219, 1)
+        case "opticaldisc.fill": return Color(rgba: 158, 158, 179, 1)
+        case "gamecontroller.fill": return Color(rgba: 181, 143, 240, 1)
+        case "shippingbox.fill": return Color(rgba: 199, 153, 112, 1)
+        default: return nil
         }
     }
 }

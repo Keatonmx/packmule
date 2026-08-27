@@ -30,10 +30,9 @@ struct TransfersSheet: View {
             }
             if transfers.items.isEmpty {
                 VStack(spacing: 10) {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 30, weight: .light))
-                        .foregroundColor(Palette.text40)
-                    Text("Nothing moving")
+                    RestingMule(height: 54)
+                        .opacity(0.9)
+                    Text("The mule is resting")
                         .font(Typography.cardTitle)
                         .foregroundColor(Palette.text55)
                     Text("Downloads land in Downloads, visible in the Files app under On My iPhone · Packmule.")
@@ -66,13 +65,18 @@ struct TransferRow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(iconBackground)
-                    Image(systemName: iconName)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(iconColor)
+                if item.status == .running {
+                    WalkingMule(height: 20)
+                        .frame(width: 34)
+                } else {
+                    ZStack {
+                        Circle().fill(iconBackground)
+                        Image(systemName: iconName)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(iconColor)
+                    }
+                    .frame(width: 34, height: 34)
                 }
-                .frame(width: 34, height: 34)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.name)

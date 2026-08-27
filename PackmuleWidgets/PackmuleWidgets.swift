@@ -73,15 +73,15 @@ struct TransferLiveActivity: Widget {
                     .padding(.horizontal, 2)
                 }
             } compactLeading: {
-                MuleGlyph()
-                    .frame(width: 22, height: 14)
+                MuleGlyph(fraction: context.state.fraction)
+                    .frame(width: 21, height: 14)
             } compactTrailing: {
                 Text("\(Int(context.state.fraction * 100))%")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(PMColors.mule)
             } minimal: {
                 MuleGlyph()
-                    .frame(width: 20, height: 13)
+                    .frame(width: 19, height: 13)
             }
         }
     }
@@ -89,13 +89,12 @@ struct TransferLiveActivity: Widget {
 
 // MARK: - Pieces
 
+/// The 16-bit pack mule. He takes a step each time the percent ticks.
 struct MuleGlyph: View {
+    var fraction: Double = 0
     var body: some View {
-        ZStack {
-            MulePackShape().fill(PMColors.pack)
-            MuleShape().fill(PMColors.mule)
-        }
-        .aspectRatio(100.0 / 64.0, contentMode: .fit)
+        PixelSprite(map: MuleSprites.stepFrame(for: fraction),
+                    palette: MuleSprites.palette)
     }
 }
 
@@ -110,7 +109,7 @@ struct MuleTrailView: View {
             let width = geo.size.width
             let height = geo.size.height
             let muleHeight = height - 5
-            let muleWidth = muleHeight * 100 / 64
+            let muleWidth = muleHeight * 26 / 18
             let travel = max(0, width - muleWidth)
             let x = travel * CGFloat(min(1, max(0, fraction)))
             ZStack(alignment: .topLeading) {
@@ -126,7 +125,7 @@ struct MuleTrailView: View {
                     p.addLine(to: CGPoint(x: max(2, x + muleWidth * 0.55), y: height - 2))
                 }
                 .stroke(PMColors.mule.opacity(0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                MuleGlyph()
+                MuleGlyph(fraction: fraction)
                     .frame(width: muleWidth, height: muleHeight)
                     .offset(x: x, y: 0)
                 if finished {
