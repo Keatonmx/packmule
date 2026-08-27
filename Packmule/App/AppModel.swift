@@ -106,6 +106,11 @@ final class AppModel: ObservableObject {
                 LiveActivityManager.shared.queueChanged(self.transfers)
             }
         }
+        if #available(iOS 16.2, *) {
+            LiveActivityManager.shared.onProblem = { [weak self] message in
+                self?.showToast(message)
+            }
+        }
         #if DEBUG
         handleLaunchArguments()
         #endif

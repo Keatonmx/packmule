@@ -9,6 +9,21 @@
 //
 
 import SwiftUI
+
+/// The whole error chain, because "operation stopped" alone helps nobody.
+func describePlaybackError(_ error: Error?) -> String {
+    guard let error else { return "This file wouldn't play" }
+    var parts: [String] = [error.localizedDescription]
+    var current = error as NSError
+    parts.append("\(current.domain) \(current.code)")
+    var depth = 0
+    while let underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError, depth < 4 {
+        parts.append("\(underlying.domain) \(underlying.code)")
+        current = underlying
+        depth += 1
+    }
+    return parts.joined(separator: " · ")
+}
 import AVFoundation
 import AVKit
 
@@ -53,7 +68,7 @@ final class PlayerEngine: NSObject, ObservableObject {
                     self.duration = seconds.isFinite ? seconds : 0
                     self.loadTracks(for: item)
                 case .failed:
-                    self.failed = item.error?.localizedDescription ?? "This file wouldn't play"
+                    self.failed = describePlaybackError(item.error)
                 default:
                     break
                 }

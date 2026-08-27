@@ -3,10 +3,16 @@
 //  Packmule
 //
 //  SMB2/3 shares via AMSMB2 (libsmb2 underneath). Two modes:
-//    • fixed share: the saved server named one (smb://host/media), the volume
-//      root is that share's root.
-//    • browse mode: the share field was left empty, the volume root lists the
-//      server's shares as folders and connects as you step into one.
+//    • fixed share: the saved server named one (smb://host/media).
+//    • browse mode: the share field was empty, the root lists the server's
+//      shares as folders.
+//
+//  CONNECTION RULE, learned the hard way: a libsmb2 context must never see
+//  two operations at once (concurrent use segfaults, or corrupts transfers
+//  into "operation stopped"). So this volume keeps SEPARATE connections:
+//    • the browse connection: listings and file ops, serialised by a gate
+//    • the transfer connection: uploads/downloads (the queue is serial)
+//    • one fresh connection per stream reader (the player opens several)
 //
 
 import Foundation
@@ -20,8 +26,13 @@ final class SMBVolume: RemoteVolume {
     /// nil = browse mode.
     private let fixedShare: String?
     private let credential: URLCredential
+
     private var client: SMB2Manager?
     private var connectedShare: String?
+    private let browseGate = AsyncGate()
+
+    private var transferManager: SMB2Manager?
+    private var transferShare: String?
 
     init(host: String, port: Int?, share: String?, username: String, password: String) {
         self.host = host
@@ -31,7 +42,7 @@ final class SMBVolume: RemoteVolume {
         self.credential = URLCredential(user: user, password: password, persistence: .forSession)
     }
 
-    func connect() async throws {
+    private func makeManager() throws -> SMB2Manager {
         var comps = URLComponents()
         comps.scheme = "smb"
         comps.host = host
@@ -40,7 +51,15 @@ final class SMBVolume: RemoteVolume {
             throw VolumeError.badAddress
         }
         manager.timeout = 30
+        return manager
+    }
+
+    func connect() async throws {
+        await browseGate.acquire()
+        defer { Task { await browseGate.release() } }
+        let manager = try makeManager()
         client = manager
+        connectedShare = nil
         if let share = fixedShare {
             try await manager.connectShare(name: share)
             connectedShare = share
@@ -77,13 +96,32 @@ final class SMBVolume: RemoteVolume {
         connectedShare = name
     }
 
-    // MARK: operations
+    /// The transfer lane's own connection; the queue runs one job at a time,
+    /// so no gate is needed here.
+    private func transferClient(forShare share: String) async throws -> SMB2Manager {
+        if let manager = transferManager, transferShare == share {
+            return manager
+        }
+        if let old = transferManager {
+            try? await old.disconnectShare()
+        }
+        transferManager = nil
+        transferShare = nil
+        let manager = try makeManager()
+        try await manager.connectShare(name: share)
+        transferManager = manager
+        transferShare = share
+        return manager
+    }
+
+    // MARK: browsing
 
     func list(_ path: String) async throws -> [FileEntry] {
+        await browseGate.acquire()
+        defer { Task { await browseGate.release() } }
         if fixedShare == nil, path == "/" || path.isEmpty {
             let shares = try await requireClient().listShares()
             return shares.compactMap { share in
-                // Hide admin shares (C$, ADMIN$, IPC$ and friends).
                 share.name.hasSuffix("$") ? nil
                     : FileEntry(name: share.name, path: "/" + share.name, isDirectory: true)
             }
@@ -104,10 +142,12 @@ final class SMBVolume: RemoteVolume {
                          size: isDir ? nil : size, modified: modified)
     }
 
+    // MARK: transfers (their own connection)
+
     func download(_ entry: FileEntry, to url: URL, progress: @escaping TransferProgress) async throws {
         let (share, rel) = try target(entry.path)
-        try await ensureShare(share)
-        try await requireClient().downloadItem(atPath: rel, to: url) { bytes, total in
+        let client = try await transferClient(forShare: share)
+        try await client.downloadItem(atPath: rel, to: url) { bytes, total in
             progress(bytes, total)
         }
     }
@@ -119,8 +159,7 @@ final class SMBVolume: RemoteVolume {
             return
         }
         let (share, rel) = try target(entry.path)
-        try await ensureShare(share)
-        let client = try requireClient()
+        let client = try await transferClient(forShare: share)
         let total = entry.size ?? -1
         let handle = try appendHandle(for: url, at: offset)
         defer { try? handle.close() }
@@ -140,15 +179,19 @@ final class SMBVolume: RemoteVolume {
 
     func upload(_ localURL: URL, toDirectory dir: String, name: String, progress: @escaping TransferProgress) async throws {
         let (share, relDir) = try target(VolumePath.join(dir, name))
-        try await ensureShare(share)
+        let client = try await transferClient(forShare: share)
         let attrs = try? FileManager.default.attributesOfItem(atPath: localURL.path)
         let total = (attrs?[.size] as? Int64) ?? -1
-        try await requireClient().uploadItem(at: localURL, toPath: relDir) { bytes in
+        try await client.uploadItem(at: localURL, toPath: relDir) { bytes in
             progress(bytes, total)
         }
     }
 
+    // MARK: file ops (browse connection, gated)
+
     func delete(_ entry: FileEntry) async throws {
+        await browseGate.acquire()
+        defer { Task { await browseGate.release() } }
         let (share, rel) = try target(entry.path)
         try await ensureShare(share)
         if entry.isDirectory {
@@ -159,45 +202,59 @@ final class SMBVolume: RemoteVolume {
     }
 
     func createFolder(named name: String, in dir: String) async throws {
+        await browseGate.acquire()
+        defer { Task { await browseGate.release() } }
         let (share, rel) = try target(VolumePath.join(dir, name))
         try await ensureShare(share)
         try await requireClient().createDirectory(atPath: rel)
     }
 
     func rename(_ entry: FileEntry, to newName: String) async throws {
+        await browseGate.acquire()
+        defer { Task { await browseGate.release() } }
         let (share, rel) = try target(entry.path)
         let (_, relNew) = try target(VolumePath.join(VolumePath.parent(of: entry.path), newName))
         try await ensureShare(share)
         try await requireClient().moveItem(atPath: rel, toPath: relNew)
     }
 
-    func disconnect() async {
-        if connectedShare != nil { try? await client?.disconnectShare() }
-        connectedShare = nil
-        client = nil
-    }
+    // MARK: streaming (one fresh connection per reader)
 
     func reader(for entry: FileEntry) async throws -> RandomAccessReader? {
         let (share, rel) = try target(entry.path)
-        try await ensureShare(share)
-        let client = try requireClient()
+        let manager = try makeManager()
+        try await manager.connectShare(name: share)
         var size = entry.size ?? -1
         if size < 0 {
-            let attrs = try await client.attributesOfItem(atPath: rel)
+            let attrs = try await manager.attributesOfItem(atPath: rel)
             size = (attrs[.fileSizeKey] as? Int64)
                 ?? (attrs[.fileSizeKey] as? NSNumber)?.int64Value
                 ?? -1
         }
-        guard size >= 0 else { return nil }
-        return SMBRandomReader(client: client, path: rel, size: size)
+        guard size >= 0 else {
+            try? await manager.disconnectShare()
+            return nil
+        }
+        return SMBRandomReader(client: manager, path: rel, size: size)
+    }
+
+    func disconnect() async {
+        if connectedShare != nil { try? await client?.disconnectShare() }
+        connectedShare = nil
+        client = nil
+        if transferShare != nil { try? await transferManager?.disconnectShare() }
+        transferManager = nil
+        transferShare = nil
     }
 }
 
-/// Ranged reads straight off the share; each call is an independent
-/// open + read, which libsmb2 handles happily at streaming chunk sizes.
+/// Ranged reads on the reader's OWN connection; reads are serialised by a
+/// gate because one AVPlayer connection reads sequentially but the volume
+/// hands out a separate reader per connection.
 final class SMBRandomReader: RandomAccessReader {
     private let client: SMB2Manager
     private let path: String
+    private let gate = AsyncGate()
     let size: Int64
 
     init(client: SMB2Manager, path: String, size: Int64) {
@@ -208,10 +265,14 @@ final class SMBRandomReader: RandomAccessReader {
 
     func read(offset: Int64, length: Int) async throws -> Data {
         guard offset < size, length > 0 else { return Data() }
+        await gate.acquire()
+        defer { Task { await gate.release() } }
         let start = UInt64(offset)
         let end = min(start + UInt64(length), UInt64(size))
         return try await client.contents(atPath: path, range: start..<end, progress: nil)
     }
 
-    func close() async {}
+    func close() async {
+        try? await client.disconnectShare()
+    }
 }

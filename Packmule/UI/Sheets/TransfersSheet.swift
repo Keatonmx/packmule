@@ -30,8 +30,7 @@ struct TransfersSheet: View {
             }
             if transfers.items.isEmpty {
                 VStack(spacing: 10) {
-                    RestingMule(height: 54)
-                        .opacity(0.9)
+                    SleepingMule(height: 54)
                     Text("The mule is resting")
                         .font(Typography.cardTitle)
                         .foregroundColor(Palette.text55)
@@ -44,9 +43,16 @@ struct TransfersSheet: View {
                 .padding(.vertical, 30)
             } else {
                 HuggingScrollView {
-                    Card(bottomSpacing: 0) {
-                        ForEach(Array(transfers.items.enumerated()), id: \.element.id) { index, item in
-                            TransferRow(item: item, showsSeparator: index < transfers.items.count - 1)
+                    VStack(spacing: 0) {
+                        if transfers.activeCount == 0 {
+                            SleepingMule(height: 42)
+                                .frame(maxWidth: .infinity)
+                                .padding(.bottom, 12)
+                        }
+                        Card(bottomSpacing: 0) {
+                            ForEach(Array(transfers.items.enumerated()), id: \.element.id) { index, item in
+                                TransferRow(item: item, showsSeparator: index < transfers.items.count - 1)
+                            }
                         }
                     }
                 }

@@ -75,6 +75,12 @@ struct HomeView: View {
                         .padding(.top, 6)
                     }
 
+                    if transfers.activeCount == 0 {
+                        SleepingMule(height: 38)
+                            .opacity(0.85)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 18)
+                    }
                     Text("EVERYTHING HERE IS FREE · THERE IS NO PRO")
                         .font(Typography.mono8Bold)
                         .tracking(1)

@@ -15,6 +15,10 @@ import ActivityKit
 final class LiveActivityManager {
     static let shared = LiveActivityManager()
 
+    /// Surfaced as a toast so island failures stop being silent.
+    var onProblem: ((String) -> Void)?
+    private var warnedOnce = false
+
     private var activity: Activity<TransferAttributes>?
     private var timer: Timer?
     private var lastName = ""
@@ -34,14 +38,28 @@ final class LiveActivityManager {
     }
 
     private func start(_ queue: TransferQueue) {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            if !warnedOnce {
+                warnedOnce = true
+                onProblem?("iOS says Live Activities are off for Packmule. Check Settings, Packmule")
+            }
+            return
+        }
         lastName = ""
         lastBytes = 0
         lastTime = Date()
         speed = 0
-        activity = try? Activity.request(
-            attributes: TransferAttributes(startedAt: Date()),
-            content: ActivityContent(state: makeState(queue), staleDate: staleDate))
+        do {
+            activity = try Activity.request(
+                attributes: TransferAttributes(startedAt: Date()),
+                content: ActivityContent(state: makeState(queue), staleDate: staleDate))
+        } catch {
+            if !warnedOnce {
+                warnedOnce = true
+                onProblem?("The island refused to start: \(error.localizedDescription)")
+            }
+            return
+        }
         timer?.invalidate()
         let ticker = Timer(timeInterval: 1.0, repeats: true) { [weak self, weak queue] _ in
             guard let self, let queue else { return }

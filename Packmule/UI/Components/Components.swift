@@ -499,6 +499,29 @@ struct RestingMule: View {
     }
 }
 
+/// The mule properly asleep: curled down with little pixel Zs drifting up.
+struct SleepingMule: View {
+    var height: CGFloat = 48
+    private let zMap = ["zzz", ".z.", "zzz"]
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.7)) { context in
+            let phase = Int(context.date.timeIntervalSinceReferenceDate / 0.7) % 2 == 0
+            VStack(alignment: .trailing, spacing: 1) {
+                HStack(alignment: .bottom, spacing: 3) {
+                    PixelSprite(map: zMap, palette: ["z": Palette.textQuaternary])
+                        .frame(height: phase ? 5 : 7)
+                    PixelSprite(map: zMap, palette: ["z": Palette.text40])
+                        .frame(height: phase ? 9 : 6)
+                }
+                .padding(.trailing, height * 0.14)
+                PixelSprite(map: MuleSprites.resting, palette: MuleSprites.palette)
+                    .frame(height: height)
+            }
+        }
+    }
+}
+
 /// SF Symbol + colour for a file, picked by extension.
 enum FileGlyph {
     static func symbol(for entry: FileEntry) -> String {
