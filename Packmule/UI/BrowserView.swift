@@ -36,8 +36,35 @@ struct BrowserView: View {
             if transfers.activeCount > 0 {
                 transfersBar
             }
+            if model.selecting {
+                selectionBar
+            }
         }
         .background(theme.bg.ignoresSafeArea())
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: 10) {
+            Text(model.selectedPaths.isEmpty ? "Pick items" : "\(model.selectedPaths.count) picked")
+                .font(Typography.detailSemibold)
+                .foregroundColor(.white)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            if !(model.volume?.isLocal ?? true) {
+                AccentPill(title: "Haul", compact: true) { model.downloadSelected() }
+            }
+            if !(model.volume?.isReadOnly ?? false) {
+                DestructivePill(title: "Delete") { model.requestDeleteSelected() }
+            }
+            SecondaryPill(title: "Done") { model.endSelecting() }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(theme.sheet)
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(theme.tintBorder.opacity(0.5), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 10)
     }
 
     // MARK: header
@@ -88,6 +115,16 @@ struct BrowserView: View {
                     model.refresh()
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                Button {
+                    model.beginSelecting()
+                } label: {
+                    Label("Select", systemImage: "checkmark.circle")
+                }
+                Button {
+                    model.openSheet(.goToPath)
+                } label: {
+                    Label("Go to path", systemImage: "arrow.right.to.line")
                 }
                 Picker("Sort", selection: $model.settings.sort) {
                     ForEach(BrowseSort.allCases) { sort in
@@ -256,6 +293,13 @@ struct FileRow: View {
                 model.open(entry)
             } label: {
                 HStack(spacing: 12) {
+                    if model.selecting {
+                        Image(systemName: model.selectedPaths.contains(entry.path)
+                              ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(model.selectedPaths.contains(entry.path)
+                                             ? theme.accent : Palette.text40)
+                    }
                     ZStack {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(entry.isDirectory ? theme.tint : theme.well)
@@ -288,19 +332,24 @@ struct FileRow: View {
             }
             .buttonStyle(RowPressStyle())
             .contextMenu {
-                if !entry.isDirectory {
-                    if model.volume is JellyfinVolume || MediaFile.isStreamable(entry.name) {
-                        Button { model.play(entry) } label: { Label("Play", systemImage: "play.fill") }
+                if !model.selecting {
+                    if !entry.isDirectory {
+                        if model.volume is JellyfinVolume || MediaFile.isStreamable(entry.name) {
+                            Button { model.play(entry) } label: { Label("Play", systemImage: "play.fill") }
+                        }
+                        if !(model.volume?.isLocal ?? false) {
+                            Button { model.download(entry) } label: { Label("Download", systemImage: "arrow.down.circle") }
+                        }
+                        Button { model.preview(entry) } label: { Label("Preview", systemImage: "eye") }
+                        Button { model.share(entry) } label: { Label("Share", systemImage: "square.and.arrow.up") }
+                    } else if !(model.volume?.isLocal ?? false) {
+                        Button { model.download(entry) } label: { Label("Download folder", systemImage: "arrow.down.circle") }
                     }
-                    if !(model.volume?.isLocal ?? false) {
-                        Button { model.download(entry) } label: { Label("Download", systemImage: "arrow.down.circle") }
+                    Button { model.copyPath(entry) } label: { Label("Copy path", systemImage: "doc.on.doc") }
+                    if !(model.volume?.isReadOnly ?? false) {
+                        Button { model.openSheet(.rename(entry)) } label: { Label("Rename", systemImage: "pencil") }
+                        Button(role: .destructive) { model.requestDelete(entry) } label: { Label("Delete", systemImage: "trash") }
                     }
-                    Button { model.preview(entry) } label: { Label("Preview", systemImage: "eye") }
-                    Button { model.share(entry) } label: { Label("Share", systemImage: "square.and.arrow.up") }
-                }
-                if !(model.volume?.isReadOnly ?? false) {
-                    Button { model.openSheet(.rename(entry)) } label: { Label("Rename", systemImage: "pencil") }
-                    Button(role: .destructive) { model.requestDelete(entry) } label: { Label("Delete", systemImage: "trash") }
                 }
             }
             if showsSeparator { RowSeparator().padding(.leading, 60) }

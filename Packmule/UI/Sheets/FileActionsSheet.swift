@@ -59,6 +59,13 @@ struct FileActionsSheet: View {
                         model.openSheet(nil)
                         model.open(entry)
                     }
+                    if isRemote {
+                        NavRow(title: "Download folder",
+                               subtitle: "Everything inside, mirrored under Downloads",
+                               showsChevron: false) {
+                            model.download(entry)
+                        }
+                    }
                 } else {
                     if canPlay {
                         NavRow(title: "Play", subtitle: playSubtitle, showsChevron: false) {
@@ -82,6 +89,11 @@ struct FileActionsSheet: View {
                         model.share(entry)
                     }
                 }
+                NavRow(title: "Copy path",
+                       detail: entry.path,
+                       showsChevron: false) {
+                    model.copyPath(entry)
+                }
                 if model.volume?.isReadOnly ?? false {
                     SettingsRow(title: "Read only",
                                 subtitle: "This library can be copied from, never changed from here",
@@ -96,6 +108,34 @@ struct FileActionsSheet: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct ConfirmDeleteManySheet: View {
+    @EnvironmentObject private var model: AppModel
+    let picked: [FileEntry]
+
+    var body: some View {
+        BottomSheet(onDismiss: { model.openSheet(nil) }) {
+            VStack(spacing: 10) {
+                Text("Delete \(picked.count) items?")
+                    .font(Typography.dialogTitle)
+                    .foregroundColor(.white)
+                Text(picked.contains(where: \.isDirectory)
+                     ? "Folders go with everything inside them. There is no undo."
+                     : "They come off the server. There is no undo.")
+                    .font(Typography.meta13)
+                    .foregroundColor(Palette.textTertiary)
+                    .multilineTextAlignment(.center)
+                HStack(spacing: 10) {
+                    SecondaryPill(title: "Cancel") { model.openSheet(nil) }
+                    DestructivePill(title: "Delete all") { model.performDeleteSelected(picked) }
+                }
+                .padding(.top, 8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
         }
     }
 }

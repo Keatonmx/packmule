@@ -88,6 +88,7 @@ struct HomeView: View {
             }
         }
         .background(theme.bg.ignoresSafeArea())
+        .onAppear { model.probeServers() }
     }
 
     private var header: some View {
@@ -240,6 +241,15 @@ struct ServerRow: View {
                                 .foregroundColor(theme.accentText)
                         }
                         .frame(width: 44, height: 44)
+                        .overlay(alignment: .bottomTrailing) {
+                            if let alive = model.reachable[server.id] {
+                                Circle()
+                                    .fill(alive ? theme.accent : Palette.text40.opacity(0.5))
+                                    .frame(width: 8, height: 8)
+                                    .overlay(Circle().stroke(theme.card, lineWidth: 2))
+                                    .offset(x: 2, y: 2)
+                            }
+                        }
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(server.displayName)
@@ -404,9 +414,15 @@ struct TransferProgressLine: View {
     }
 
     private var label: String {
-        if item.total > 0 {
-            return "\(item.bytes.fileSizeString) of \(item.total.fileSizeString)"
+        var parts: [String] = []
+        if item.fileCount > 0 {
+            parts.append("\(item.filesDone) of \(item.fileCount)")
         }
-        return item.bytes.fileSizeString
+        if item.total > 0 {
+            parts.append("\(item.bytes.fileSizeString) of \(item.total.fileSizeString)")
+        } else {
+            parts.append(item.bytes.fileSizeString)
+        }
+        return parts.joined(separator: " · ")
     }
 }

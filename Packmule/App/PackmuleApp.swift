@@ -111,6 +111,15 @@ struct RootView: View {
                     HostSheet()
                 case .passwordPrompt(let server):
                     PasswordPromptSheet(server: server)
+                case .goToPath:
+                    TextPromptSheet(title: "Go to path", subtitle: model.browserTitle,
+                                    initialText: model.path, submitLabel: "Go") { path in
+                        model.goTo(path)
+                    }
+                case .confirmDeleteMany(let picked):
+                    ConfirmDeleteManySheet(picked: picked)
+                case .connectionDetails(let server):
+                    ConnectionDetailsSheet(server: server)
                 }
             }
         }

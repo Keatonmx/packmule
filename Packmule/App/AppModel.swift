@@ -29,6 +29,12 @@ enum ActiveSheet: Equatable {
     case host
     /// The server's password isn't stored; ask, connect, forget.
     case passwordPrompt(SavedServer)
+    /// Type or paste a path, jump straight there.
+    case goToPath
+    /// Multi-select delete confirmation.
+    case confirmDeleteMany([FileEntry])
+    /// Reachability, round trip time, server banner.
+    case connectionDetails(SavedServer)
 }
 
 @MainActor
@@ -58,6 +64,13 @@ final class AppModel: ObservableObject {
     @Published var browserLoading = false
     @Published var browserError: String?
     @Published var searchText = ""
+    /// Multi-select mode in the browser.
+    @Published var selecting = false
+    @Published var selectedPaths: Set<String> = []
+    /// smb://host/share style prefix for the connected volume (copy path).
+    @Published var browserAddress = ""
+    /// Pulse dots on the server cards: id -> answered the last probe.
+    @Published var reachable: [UUID: Bool] = [:]
 
     // System sheets
     @Published var quickLookURL: URL?
@@ -193,6 +206,8 @@ final class AppModel: ObservableObject {
                 self.volume = volume
                 browserTitle = server.displayName
                 browserKind = volume.kindLabel
+                browserAddress = server.addressLine
+                reachable[server.id] = true
                 if let idx = servers.firstIndex(where: { $0.id == server.id }) {
                     servers[idx].lastConnected = Date()
                     persistServers()
@@ -237,6 +252,7 @@ final class AppModel: ObservableObject {
             self.volume = volume
             browserTitle = "This iPhone"
             browserKind = volume.kindLabel
+            browserAddress = ""
             enterBrowser(at: "/")
         }
     }
@@ -253,6 +269,7 @@ final class AppModel: ObservableObject {
             self.volume = volume
             browserTitle = "Photos"
             browserKind = volume.kindLabel
+            browserAddress = ""
             enterBrowser(at: "/")
         }
     }
@@ -275,6 +292,7 @@ final class AppModel: ObservableObject {
             self.volume = volume
             browserTitle = folder.name
             browserKind = volume.kindLabel
+            browserAddress = ""
             enterBrowser(at: "/")
         }
     }
@@ -323,6 +341,9 @@ final class AppModel: ObservableObject {
         path = "/"
         browserError = nil
         searchText = ""
+        browserAddress = ""
+        selecting = false
+        selectedPaths = []
         // Leave the connection alive while it still has transfers to finish.
         if transfers.activeCount == 0 {
             Task { await volume?.disconnect() }
@@ -333,6 +354,8 @@ final class AppModel: ObservableObject {
 
     func load(_ newPath: String) {
         guard let volume else { return }
+        selecting = false
+        selectedPaths = []
         path = newPath
         browserError = nil
         browserLoading = true
@@ -373,11 +396,112 @@ final class AppModel: ObservableObject {
     }
 
     func open(_ entry: FileEntry) {
+        if selecting {
+            toggleSelection(entry)
+            return
+        }
         if entry.isDirectory {
             searchText = ""
             load(entry.path)
         } else {
             openSheet(.fileActions(entry))
+        }
+    }
+
+    // MARK: - Multi-select
+
+    func beginSelecting() {
+        selecting = true
+        selectedPaths = []
+    }
+
+    func endSelecting() {
+        selecting = false
+        selectedPaths = []
+    }
+
+    func toggleSelection(_ entry: FileEntry) {
+        ButtonHaptics.shared.tick()
+        if selectedPaths.contains(entry.path) {
+            selectedPaths.remove(entry.path)
+        } else {
+            selectedPaths.insert(entry.path)
+        }
+    }
+
+    var selectedEntries: [FileEntry] {
+        entries.filter { selectedPaths.contains($0.path) }
+    }
+
+    func downloadSelected() {
+        guard let volume else { return }
+        let picked = selectedEntries
+        for entry in picked {
+            if entry.isDirectory {
+                transfers.enqueueFolderDownload(volume: volume, folder: entry, from: browserTitle)
+            } else {
+                transfers.enqueueDownload(volume: volume, entry: entry, from: browserTitle)
+            }
+        }
+        endSelecting()
+        guard !picked.isEmpty else { return }
+        showToast(picked.count == 1 ? "Hauling \(picked[0].name)" : "Hauling \(picked.count) items")
+    }
+
+    func requestDeleteSelected() {
+        let picked = selectedEntries
+        guard !picked.isEmpty else { return }
+        openSheet(.confirmDeleteMany(picked))
+    }
+
+    func performDeleteSelected(_ picked: [FileEntry]) {
+        guard let volume else { return }
+        openSheet(nil)
+        endSelecting()
+        Task {
+            var failed = 0
+            for entry in picked {
+                do {
+                    try await volume.delete(entry)
+                } catch {
+                    failed += 1
+                }
+            }
+            showToast(failed == 0 ? "Deleted \(picked.count) items"
+                                  : "Deleted \(picked.count - failed), \(failed) refused")
+            refresh()
+        }
+    }
+
+    // MARK: - Paths for people who think in paths
+
+    func goTo(_ rawPath: String) {
+        openSheet(nil)
+        let trimmed = rawPath.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        searchText = ""
+        load(trimmed.hasPrefix("/") ? trimmed : "/" + trimmed)
+    }
+
+    func copyPath(_ entry: FileEntry) {
+        UIPasteboard.general.string = browserAddress.isEmpty
+            ? entry.path
+            : browserAddress + entry.path
+        openSheet(nil)
+        showToast("Copied")
+    }
+
+    // MARK: - Reachability pulse
+
+    func probeServers() {
+        for server in servers {
+            let host = server.host
+            let port = server.port ?? server.kind.defaultPort
+            let id = server.id
+            Task { [weak self] in
+                let result = await Probe.tcp(host: host, port: port)
+                self?.reachable[id] = result.rttMillis != nil
+            }
         }
     }
 
@@ -398,7 +522,11 @@ final class AppModel: ObservableObject {
 
     func download(_ entry: FileEntry) {
         guard let volume else { return }
-        transfers.enqueueDownload(volume: volume, entry: entry, from: browserTitle)
+        if entry.isDirectory {
+            transfers.enqueueFolderDownload(volume: volume, folder: entry, from: browserTitle)
+        } else {
+            transfers.enqueueDownload(volume: volume, entry: entry, from: browserTitle)
+        }
         openSheet(nil)
         showToast("Hauling \(entry.name)")
     }

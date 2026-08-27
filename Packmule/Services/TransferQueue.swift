@@ -50,7 +50,7 @@ final class TransferItem: ObservableObject, Identifiable {
     let direction: TransferDirection
     let purpose: TransferPurpose
     /// "Home media" or wherever it's going/coming from.
-    let detail: String
+    var detail: String
 
     @Published var status: TransferStatus = .queued
     @Published var fraction: Double = 0
@@ -62,6 +62,10 @@ final class TransferItem: ObservableObject, Identifiable {
     var plannedDestination: URL?
     /// Failed tries so far; the queue resumes downloads from the partial's size.
     var attempts = 0
+    /// Folder hauls: how many files, and how many are done.
+    var isFolder = false
+    var fileCount = 0
+    @Published var filesDone = 0
 
     /// Read from the transfer thread via the progress callback.
     var cancelRequested = false
@@ -120,6 +124,98 @@ final class TransferQueue: ObservableObject {
                 try await volume.download(entry, to: dest, progress: onProgress)
             }
             return dest
+        }
+        add(item)
+    }
+
+    /// Hauls a whole folder: walks the tree, mirrors the structure under
+    /// Downloads, and moves file after file inside ONE queue item with
+    /// aggregate progress. Retries skip completed files and resume the torn one.
+    func enqueueFolderDownload(volume: RemoteVolume, folder: FileEntry, from serverName: String) {
+        let item = TransferItem(name: folder.name, direction: .download, purpose: .keep, detail: serverName)
+        item.isFolder = true
+        let destRoot = LocalFiles.uniqueDestination(for: folder.name, in: LocalFiles.downloadsURL)
+        item.plannedDestination = destRoot
+        work[item.id] = { [weak item] _ in
+            if (item?.attempts ?? 0) > 0 {
+                try? await volume.connect()
+            }
+            // Walk the tree breadth first (bounded so a cyclic or absurd
+            // share can't run away; the cap is announced, never silent).
+            var files: [(entry: FileEntry, dest: URL)] = []
+            var dirs: [(remote: String, local: URL)] = [(folder.path, destRoot)]
+            var index = 0
+            var truncated = false
+            var totalBytes: Int64 = 0
+            while index < dirs.count {
+                let (remotePath, localDir) = dirs[index]
+                index += 1
+                try FileManager.default.createDirectory(at: localDir, withIntermediateDirectories: true)
+                let children = try await volume.list(remotePath)
+                for child in children {
+                    if item?.cancelRequested ?? true { throw VolumeError.cancelled }
+                    if child.isDirectory {
+                        if dirs.count < 512 {
+                            dirs.append((child.path, localDir.appendingPathComponent(child.name)))
+                        } else {
+                            truncated = true
+                        }
+                    } else if files.count < 5_000 {
+                        files.append((child, localDir.appendingPathComponent(child.name)))
+                        totalBytes += child.size ?? 0
+                    } else {
+                        truncated = true
+                    }
+                }
+            }
+            let plannedTotal = totalBytes
+            let plannedCount = files.count
+            DispatchQueue.main.async { [weak item] in
+                guard let item else { return }
+                item.total = plannedTotal
+                item.fileCount = plannedCount
+            }
+
+            var doneBytes: Int64 = 0
+            var doneFiles = 0
+            for (file, dest) in files {
+                if item?.cancelRequested ?? true { throw VolumeError.cancelled }
+                let attrs = try? FileManager.default.attributesOfItem(atPath: dest.path)
+                let existing = (attrs?[.size] as? Int64) ?? 0
+                if let size = file.size, size > 0, existing == size {
+                    // Already hauled on an earlier attempt.
+                    doneBytes += size
+                    doneFiles += 1
+                    Self.reportFolder(item, bytes: doneBytes, files: doneFiles)
+                    continue
+                }
+                let base = doneBytes
+                let onProgress: TransferProgress = { bytes, _ in
+                    Self.report(item, bytes: base + bytes, total: -1)
+                    return !(item?.cancelRequested ?? true)
+                }
+                if existing > 0, file.size != nil {
+                    try await volume.download(file, to: dest, resumingFrom: existing, progress: onProgress)
+                } else {
+                    try await volume.download(file, to: dest, progress: onProgress)
+                }
+                let landed: Int64
+                if let size = file.size {
+                    landed = size
+                } else {
+                    let after = try? FileManager.default.attributesOfItem(atPath: dest.path)
+                    landed = (after?[.size] as? Int64) ?? 0
+                }
+                doneBytes = base + landed
+                doneFiles += 1
+                Self.reportFolder(item, bytes: doneBytes, files: doneFiles)
+            }
+            if truncated {
+                DispatchQueue.main.async { [weak item] in
+                    item?.detail += " · stopped at 5000 files"
+                }
+            }
+            return destRoot
         }
         add(item)
     }
@@ -184,6 +280,17 @@ final class TransferQueue: ObservableObject {
     }
 
     // MARK: engine
+
+    private nonisolated static func reportFolder(_ item: TransferItem?, bytes: Int64, files: Int) {
+        DispatchQueue.main.async {
+            guard let item else { return }
+            item.bytes = bytes
+            item.filesDone = files
+            if item.total > 0 {
+                item.fraction = min(1, Double(bytes) / Double(item.total))
+            }
+        }
+    }
 
     private nonisolated static func report(_ item: TransferItem?, bytes: Int64, total: Int64) {
         DispatchQueue.main.async {
