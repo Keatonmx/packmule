@@ -306,12 +306,12 @@ struct FileRow: View {
                     .frame(width: 36, height: 36)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.name)
+                        Text(displayName ?? entry.name)
                             .font(Typography.row)
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
                             .truncationMode(.middle)
-                        Text(entry.metaLine)
+                        Text(meta)
                             .font(Typography.rowSubtitle)
                             .foregroundColor(Palette.textTertiary)
                             .lineLimit(1)
@@ -328,6 +328,10 @@ struct FileRow: View {
             }
             .buttonStyle(RowPressStyle())
             .contextMenu {
+                // The tidied row hides tags and extension; hold shows the truth.
+                if displayName != nil {
+                    Section(entry.name) { EmptyView() }
+                }
                 if !model.selecting {
                     if !entry.isDirectory {
                         if model.volume is JellyfinVolume || MediaFile.isStreamable(entry.name) {
@@ -350,5 +354,18 @@ struct FileRow: View {
             }
             if showsSeparator { RowSeparator().padding(.leading, 60) }
         }
+    }
+
+    /// Tidied ROM title when the setting is on and the file qualifies.
+    private var displayName: String? {
+        guard model.settings.tidyROMNames, !entry.isDirectory else { return nil }
+        return ROMNames.tidy(entry.name)
+    }
+
+    /// When the title hides the extension, the meta line carries it instead.
+    private var meta: String {
+        guard displayName != nil else { return entry.metaLine }
+        let ext = (entry.name as NSString).pathExtension.uppercased()
+        return ext.isEmpty ? entry.metaLine : "\(ext) · \(entry.metaLine)"
     }
 }

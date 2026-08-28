@@ -16,6 +16,12 @@ struct AppSettings: Codable, Equatable {
     var sort: BrowseSort = .name
     var foldersFirst = true
     var showHidden = false
+    /// Optional in storage so older saved settings still decode.
+    var tidyROMNamesRaw: Bool? = true
+    var tidyROMNames: Bool {
+        get { tidyROMNamesRaw ?? true }
+        set { tidyROMNamesRaw = newValue }
+    }
 
     // Transfers
     var keepAwakeWhileHauling = true

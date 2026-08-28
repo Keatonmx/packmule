@@ -44,7 +44,7 @@ struct FileActionsSheet: View {
                     Text(entry.name)
                         .font(Typography.rowSemibold)
                         .foregroundColor(.white)
-                        .lineLimit(2)
+                        .lineLimit(4)
                         .truncationMode(.middle)
                     Text(entry.metaLine)
                         .font(Typography.rowSubtitle)

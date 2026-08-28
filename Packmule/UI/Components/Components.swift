@@ -528,6 +528,56 @@ struct SleepingMule: View {
     }
 }
 
+/// Display cleanup for ROM style names: "Legend of Zelda, The - A Link to the
+/// Past (USA) (Rev 1).zip" reads as "The Legend of Zelda - A Link to the
+/// Past". Display only, the files themselves are never touched.
+enum ROMNames {
+    private static let exts: Set<String> = [
+        "zip", "7z", "gba", "gb", "gbc", "sgb", "nes", "fds", "sfc", "smc",
+        "n64", "z64", "v64", "nds", "3ds", "cia", "gg", "sms", "md", "gen",
+        "32x", "pce", "ngp", "ngc", "ws", "wsc", "a26", "a78", "lnx",
+        "col", "vec", "chd", "iso", "cue", "gdi",
+    ]
+
+    /// nil when the name isn't ROM shaped (extension not on the list).
+    static func tidy(_ name: String) -> String? {
+        let ext = (name as NSString).pathExtension.lowercased()
+        guard exts.contains(ext) else { return nil }
+        let base = (name as NSString).deletingPathExtension
+        // Drop every (...) and [...] tag group: regions, languages, revisions.
+        var cleaned = ""
+        var depth = 0
+        for ch in base {
+            switch ch {
+            case "(", "[":
+                depth += 1
+            case ")", "]":
+                if depth > 0 { depth -= 1 }
+            default:
+                if depth == 0 { cleaned.append(ch) }
+            }
+        }
+        // Send trailing articles home: "Zelda, The - X" becomes "The Zelda - X".
+        let segments = cleaned.components(separatedBy: " - ").map { segment -> String in
+            var s = segment.trimmingCharacters(in: .whitespaces)
+            for article in ["The", "A", "An"] {
+                let suffix = ", \(article)"
+                if s.hasSuffix(suffix) {
+                    s = "\(article) " + s.dropLast(suffix.count)
+                    break
+                }
+            }
+            return s
+        }
+        var result = segments.filter { !$0.isEmpty }.joined(separator: " - ")
+        while result.contains("  ") {
+            result = result.replacingOccurrences(of: "  ", with: " ")
+        }
+        result = result.trimmingCharacters(in: .whitespaces)
+        return result.isEmpty ? nil : result
+    }
+}
+
 /// SF Symbol + colour for a file, picked by extension.
 enum FileGlyph {
     static func symbol(for entry: FileEntry) -> String {
