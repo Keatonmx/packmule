@@ -663,6 +663,13 @@ final class AppModel: ObservableObject {
             playerRequest = PlayerRequest(title: entry.name, url: local)
             return
         }
+        // Apple's player refuses raw FLAC over HTTP (a format whitelist, not a
+        // server problem); as a local file it plays fine, so fetch first.
+        if MediaFile.ext(entry.name) == "flac" {
+            transfers.enqueueDownload(volume: volume, entry: entry, from: browserTitle, purpose: .play)
+            showToast("FLAC can't stream on the Apple player yet: fetching a copy")
+            return
+        }
         let title = entry.name
         Task {
             do {
