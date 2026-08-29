@@ -64,6 +64,8 @@ final class AppModel: ObservableObject {
     @Published var browserLoading = false
     @Published var browserError: String?
     @Published var searchText = ""
+    /// Browser type filter; folders always pass.
+    @Published var typeFilter: FileTypeFilter = .all
     /// Multi-select mode in the browser.
     @Published var selecting = false
     @Published var selectedPaths: Set<String> = []
@@ -127,8 +129,12 @@ final class AppModel: ObservableObject {
     }
 
     var visibleEntries: [FileEntry] {
-        guard !searchText.isEmpty else { return entries }
-        return entries.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        var list = entries
+        if typeFilter != .all {
+            list = list.filter { typeFilter.matches($0) }
+        }
+        guard !searchText.isEmpty else { return list }
+        return list.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
     // MARK: - Sheets & toasts
@@ -349,6 +355,7 @@ final class AppModel: ObservableObject {
         browserAddress = ""
         selecting = false
         selectedPaths = []
+        typeFilter = .all
         // Leave the connection alive while it still has transfers to finish.
         if transfers.activeCount == 0 {
             Task { await volume?.disconnect() }

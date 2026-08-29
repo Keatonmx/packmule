@@ -22,6 +22,11 @@ struct AppSettings: Codable, Equatable {
         get { tidyROMNamesRaw ?? true }
         set { tidyROMNamesRaw = newValue }
     }
+    var tidySongNamesRaw: Bool? = true
+    var tidySongNames: Bool {
+        get { tidySongNamesRaw ?? true }
+        set { tidySongNamesRaw = newValue }
+    }
 
     // Transfers
     var keepAwakeWhileHauling = true

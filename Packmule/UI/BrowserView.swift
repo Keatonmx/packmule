@@ -15,6 +15,7 @@ struct BrowserView: View {
     @Environment(\.theme) private var theme
 
     @FocusState private var searchFocused: Bool
+    @State private var showingFilters = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +23,9 @@ struct BrowserView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
+                    if showingFilters {
+                        filterChips
+                    }
                     if model.entries.count > 12 || !model.searchText.isEmpty {
                         searchBar
                     }
@@ -95,6 +99,12 @@ struct BrowserView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            CircleIconButton(action: { withAnimation(.easeInOut(duration: 0.2)) { showingFilters.toggle() } }) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(model.typeFilter != .all ? theme.accentText : Palette.text70)
+            }
+
             if !(model.volume?.isReadOnly ?? false) {
                 CircleIconButton(action: { model.showingImporter = true }) {
                     Image(systemName: "plus")
@@ -157,6 +167,59 @@ struct BrowserView: View {
         .padding(.bottom, 10)
     }
 
+    /// Type chips plus the tidy name toggles, one scrollable row.
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                ForEach(FileTypeFilter.allCases) { filter in
+                    let selected = model.typeFilter == filter
+                    Button {
+                        ButtonHaptics.shared.tap()
+                        model.typeFilter = filter
+                    } label: {
+                        Text(filter.rawValue)
+                            .font(Typography.chip)
+                            .foregroundColor(selected ? .white : Palette.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(selected ? theme.accent : theme.chip)
+                            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Palette.hairline08, lineWidth: 0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Rectangle().fill(Palette.separator).frame(width: 0.5, height: 18).padding(.horizontal, 4)
+
+                tidyChip("Tidy ROMs", isOn: $model.settings.tidyROMNames)
+                tidyChip("Tidy songs", isOn: $model.settings.tidySongNames)
+            }
+            .padding(.horizontal, 2)
+        }
+        .padding(.top, -6)
+    }
+
+    private func tidyChip(_ title: String, isOn: Binding<Bool>) -> some View {
+        Button {
+            ButtonHaptics.shared.tap()
+            isOn.wrappedValue.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isOn.wrappedValue ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 10, weight: .bold))
+                Text(title)
+                    .font(Typography.chip)
+            }
+            .foregroundColor(isOn.wrappedValue ? theme.accentText : Palette.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(isOn.wrappedValue ? theme.tint : theme.chip)
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(isOn.wrappedValue ? theme.tintBorder : Palette.hairline08, lineWidth: isOn.wrappedValue ? 1 : 0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundColor(Palette.text40)
@@ -217,7 +280,8 @@ struct BrowserView: View {
             VStack(spacing: 10) {
                 RestingMule(height: 54)
                     .opacity(0.9)
-                Text(model.searchText.isEmpty ? "Nothing to haul here" : "No files match")
+                Text(!model.searchText.isEmpty ? "No files match"
+                     : (model.typeFilter == .all ? "Nothing to haul here" : "Nothing of that type here"))
                     .font(Typography.cardTitle)
                     .foregroundColor(Palette.text55)
                 if model.searchText.isEmpty, !(model.volume?.isReadOnly ?? false) {
@@ -356,10 +420,12 @@ struct FileRow: View {
         }
     }
 
-    /// Tidied ROM title when the setting is on and the file qualifies.
+    /// Tidied title when a setting is on and the file qualifies.
     private var displayName: String? {
-        guard model.settings.tidyROMNames, !entry.isDirectory else { return nil }
-        return ROMNames.tidy(entry.name)
+        guard !entry.isDirectory else { return nil }
+        if model.settings.tidyROMNames, let tidy = ROMNames.tidy(entry.name) { return tidy }
+        if model.settings.tidySongNames, let tidy = SongNames.tidy(entry.name) { return tidy }
+        return nil
     }
 
     /// When the title hides the extension, the meta line carries it instead.

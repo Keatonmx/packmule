@@ -46,10 +46,6 @@ struct SettingsSheet: View {
                                     subtitle: "Folders sit above files in every listing, whatever the sort") {
                             MuleToggle(isOn: $model.settings.foldersFirst)
                         }
-                        SettingsRow(title: "Tidy ROM names",
-                                    subtitle: "Zelda instead of Zelda, The (USA) (Rev 1).zip. Display only, files are never renamed. Hold a row for the real name") {
-                            MuleToggle(isOn: $model.settings.tidyROMNames)
-                        }
                         SettingsRow(title: "Hidden files", subtitle: "Names starting with a dot",
                                     showsSeparator: false) {
                             MuleToggle(isOn: $model.settings.showHidden)

@@ -539,10 +539,13 @@ enum ROMNames {
         "col", "vec", "chd", "iso", "cue", "gdi",
     ]
 
+    static func isROM(_ name: String) -> Bool {
+        exts.contains((name as NSString).pathExtension.lowercased())
+    }
+
     /// nil when the name isn't ROM shaped (extension not on the list).
     static func tidy(_ name: String) -> String? {
-        let ext = (name as NSString).pathExtension.lowercased()
-        guard exts.contains(ext) else { return nil }
+        guard isROM(name) else { return nil }
         let base = (name as NSString).deletingPathExtension
         // Drop every (...) and [...] tag group: regions, languages, revisions.
         var cleaned = ""
@@ -575,6 +578,59 @@ enum ROMNames {
         }
         result = result.trimmingCharacters(in: .whitespaces)
         return result.isEmpty ? nil : result
+    }
+}
+
+/// Display cleanup for music: "07 - Sabotage.mp3" reads as "Sabotage".
+/// Strips leading track and disc numbers only when a real separator follows,
+/// so titles that START with a number ("99 Problems") are left alone.
+enum SongNames {
+    private static let exts: Set<String> = [
+        "mp3", "m4a", "aac", "flac", "wav", "aiff", "aif", "ogg", "opus",
+        "wma", "caf", "mid", "midi",
+    ]
+
+    static func tidy(_ name: String) -> String? {
+        let ext = (name as NSString).pathExtension.lowercased()
+        guard exts.contains(ext) else { return nil }
+        var base = (name as NSString).deletingPathExtension
+        // "07 - X", "03. X", "12_X", "1-05 - X" (twice for disc-track forms)
+        var passes = 0
+        while passes < 2,
+              let range = base.range(of: #"^\d{1,3}\s*[-._]\s*"#, options: .regularExpression) {
+            let stripped = String(base[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            if stripped.isEmpty { break }
+            base = stripped
+            passes += 1
+        }
+        base = base.trimmingCharacters(in: .whitespaces)
+        return base.isEmpty ? nil : base
+    }
+}
+
+/// Type filter for the browser: folders always pass so navigation survives.
+enum FileTypeFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case video = "Video"
+    case music = "Music"
+    case photos = "Photos"
+    case roms = "ROMs"
+    case archives = "Archives"
+    case docs = "Docs"
+    var id: String { rawValue }
+
+    func matches(_ entry: FileEntry) -> Bool {
+        if entry.isDirectory { return true }
+        switch self {
+        case .all: return true
+        case .video: return FileGlyph.symbol(for: entry) == "film.fill"
+        case .music: return FileGlyph.symbol(for: entry) == "music.note"
+        case .photos: return FileGlyph.symbol(for: entry) == "photo.fill"
+        case .roms: return ROMNames.isROM(entry.name)
+        case .archives: return FileGlyph.symbol(for: entry) == "archivebox.fill"
+        case .docs:
+            return ["doc.text.fill", "book.fill", "doc.fill"].contains(FileGlyph.symbol(for: entry))
+        }
     }
 }
 
