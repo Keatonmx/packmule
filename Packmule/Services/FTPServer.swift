@@ -74,7 +74,12 @@ final class FTPServer: ObservableObject {
         do {
             let listener = try NWListener(using: params, on: nwPort)
             // Advertise over Bonjour so other Packmules list it under Nearby.
-            listener.service = NWListener.Service(name: UIDevice.current.name, type: "_ftp._tcp")
+            // The TXT marker is how another Packmule KNOWS it's one of us and
+            // offers tap to browse instead of a generic add form.
+            var txt = NWTXTRecord()
+            txt["packmule"] = "1"
+            listener.service = NWListener.Service(name: UIDevice.current.name, type: "_ftp._tcp",
+                                                  domain: nil, txtRecord: txt)
             listener.newConnectionHandler = { [weak self] connection in
                 self?.queue.async { self?.accept(connection, mounts: sessionMounts) }
             }

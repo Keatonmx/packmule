@@ -29,12 +29,17 @@ struct HomeView: View {
                     addServerTile
                         .padding(.bottom, 20)
 
-                    if !discovery.services.isEmpty {
+                    // A hosting phone sees its own advertisement; hide it.
+                    let nearby = discovery.services.filter { service in
+                        !(service.isPackmule && model.ftpServer.running
+                          && service.name == UIDevice.current.name)
+                    }
+                    if !nearby.isEmpty {
                         SectionHeader(title: "Nearby")
                         Card {
-                            ForEach(Array(discovery.services.enumerated()), id: \.element.id) { index, service in
+                            ForEach(Array(nearby.enumerated()), id: \.element.id) { index, service in
                                 NearbyRow(service: service,
-                                          showsSeparator: index < discovery.services.count - 1)
+                                          showsSeparator: index < nearby.count - 1)
                             }
                         }
                     }
@@ -329,24 +334,54 @@ struct NearbyRow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.tint3)
-                    Image(systemName: "dot.radiowaves.left.and.right")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(theme.accentText)
-                }
-                .frame(width: 44, height: 44)
+                if service.isPackmule {
+                    // A fellow mule: recognizable at a glance, tap walks right in.
+                    Button {
+                        ButtonHaptics.shared.tap()
+                        model.connectNearby(service)
+                    } label: {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.tint)
+                                PixelSprite(map: MuleSprites.walkA, palette: MuleSprites.palette)
+                                    .frame(width: 30, height: 21)
+                            }
+                            .frame(width: 44, height: 44)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(service.name)
-                        .font(Typography.rowSemibold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    Text("Advertising \(service.kind.rawValue) on this network")
-                        .font(Typography.rowSubtitle)
-                        .foregroundColor(Palette.textTertiary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(service.name)
+                                    .font(Typography.rowSemibold)
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text("Another Packmule. Tap to browse it")
+                                    .font(Typography.rowSubtitle)
+                                    .foregroundColor(theme.accentText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(RowPressStyle())
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.tint3)
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(theme.accentText)
+                    }
+                    .frame(width: 44, height: 44)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(service.name)
+                            .font(Typography.rowSemibold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        Text("Advertising \(service.kind.rawValue) on this network")
+                            .font(Typography.rowSubtitle)
+                            .foregroundColor(Palette.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
 
                 TintPill(title: "Add") {
                     model.addDiscovered(service)

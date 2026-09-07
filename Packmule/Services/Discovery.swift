@@ -39,17 +39,27 @@ final class Discovery: ObservableObject {
     func injectDemo() {
         frozen = true
         services = [
+            DiscoveredService(id: "demo-mule", name: "Keaton's other iPhone", kind: .ftp, isPackmule: true),
             DiscoveredService(id: "demo-nas", name: "Redfern NAS", kind: .smb),
             DiscoveredService(id: "demo-ftp", name: "workshop-pi", kind: .ftp),
         ]
     }
 
     private func browse(type: String, kind: ServerKind) {
-        let browser = NWBrowser(for: .bonjour(type: type, domain: nil), using: .tcp)
+        // TXT records carry the packmule marker; only FTP advertisements have one.
+        let descriptor: NWBrowser.Descriptor = kind == .ftp
+            ? .bonjourWithTXTRecord(type: type, domain: nil)
+            : .bonjour(type: type, domain: nil)
+        let browser = NWBrowser(for: descriptor, using: .tcp)
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             let list: [DiscoveredService] = results.compactMap { result in
                 guard case let .service(name, _, _, _) = result.endpoint else { return nil }
-                return DiscoveredService(id: "\(type):\(name)", name: name, kind: kind)
+                var isPackmule = false
+                if case let .bonjour(record) = result.metadata {
+                    isPackmule = record["packmule"] == "1"
+                }
+                return DiscoveredService(id: "\(type):\(name)", name: name, kind: kind,
+                                         isPackmule: isPackmule)
             }
             let pairs: [(String, NWEndpoint)] = results.compactMap { result in
                 guard case let .service(name, _, _, _) = result.endpoint else { return nil }

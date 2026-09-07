@@ -76,6 +76,8 @@ struct DiscoveredService: Identifiable, Equatable {
     let id: String
     let name: String
     let kind: ServerKind
+    /// Another phone running Packmule (its Bonjour TXT record says so).
+    var isPackmule = false
 }
 
 // MARK: - Files

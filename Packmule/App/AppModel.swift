@@ -226,9 +226,32 @@ final class AppModel: ObservableObject {
                 let start = server.kind == .smb ? "/" : Self.normalized(server.startPath)
                 enterBrowser(at: start)
             } catch {
-                showToast(Self.friendly(error))
+                if let volumeError = error as? VolumeError, case .authFailed = volumeError {
+                    // Wrong or missing sign in: ask instead of just complaining.
+                    openSheet(.passwordPrompt(server))
+                } else {
+                    showToast(Self.friendly(error))
+                }
             }
             connectingID = nil
+        }
+    }
+
+    /// Tap a fellow Packmule under Nearby: resolve it and walk right in.
+    func connectNearby(_ service: DiscoveredService) {
+        Task {
+            guard let resolved = await discovery.resolve(service) else {
+                showToast("Couldn't reach \(service.name)")
+                return
+            }
+            var server = SavedServer()
+            server.kind = .ftp
+            server.name = service.name
+            server.host = resolved.host
+            if resolved.port != ServerKind.ftp.defaultPort {
+                server.port = resolved.port
+            }
+            connect(server)
         }
     }
 
