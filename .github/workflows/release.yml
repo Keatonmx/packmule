@@ -72,10 +72,15 @@ jobs:
           security default-keychain -s "$KEYCHAIN"
           security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "${{ secrets.DIST_P12_PASSWORD }}" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci "$KEYCHAIN" > /dev/null
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$RUNNER_TEMP/app.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/packmule-app.mobileprovision"
-          cp "$RUNNER_TEMP/widgets.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/packmule-widgets.mobileprovision"
+          # Xcode 15 reads MobileDevice, Xcode 16 reads Developer/Xcode/UserData;
+          # install to both so the selected Xcode always finds them.
+          for DIR in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$DIR"
+            cp "$RUNNER_TEMP/app.mobileprovision" "$DIR/packmule-app.mobileprovision"
+            cp "$RUNNER_TEMP/widgets.mobileprovision" "$DIR/packmule-widgets.mobileprovision"
+          done
           security find-identity -v -p codesigning "$KEYCHAIN"
+          security cms -D -i "$RUNNER_TEMP/app.mobileprovision" | plutil -extract Name raw -o - - || true
 
       - name: Archive (manual signing)
         run: |
