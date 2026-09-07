@@ -29,7 +29,9 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-14
+    # App Store validation requires the current iOS SDK; this lane rides the
+    # newest runner image and Xcode while the sideload lane keeps its pin.
+    runs-on: macos-15
     timeout-minutes: 60
     env:
       SCHEME: Packmule
@@ -40,10 +42,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: Select the newest stable Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | grep -v beta | sort -V | tail -n 1)"
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | grep -viE "beta|rc" | sort -V | tail -n 1)"
           xcodebuild -version
+          xcodebuild -showsdks | grep iphoneos
 
       - name: Cache Swift packages
         uses: actions/cache@v4
@@ -145,7 +148,15 @@ jobs:
           # altool reads API keys from ~/private_keys by convention.
           mkdir -p "$HOME/private_keys"
           cp "$RUNNER_TEMP/keys/AuthKey.p8" "$HOME/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
-          xcrun altool --upload-app -f Packmule-signed.ipa -t ios \
+          # Newer Xcodes dropped altool; borrow it from an older install if needed.
+          if xcrun -f altool > /dev/null 2>&1; then
+            UPLOAD="xcrun altool"
+          else
+            OLD=$(ls -d /Applications/Xcode_1[5-9]*.app 2>/dev/null | sort -V | tail -n 1)
+            echo "altool missing in selected Xcode, borrowing from: $OLD"
+            UPLOAD="env DEVELOPER_DIR=$OLD xcrun altool"
+          fi
+          $UPLOAD --upload-app -f Packmule-signed.ipa -t ios \
             --apiKey "${{ secrets.ASC_KEY_ID }}" \
             --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
             2>&1 | tee xcodebuild-export.log | (grep -vE "^\s*$" | tail -n 20)
