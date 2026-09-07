@@ -89,12 +89,17 @@ enum MuleSprites {
         Box(x: 3, y: 6, w: 15, h: 7, ch: "b"),    // body
         Box(x: 8, y: 6, w: 1, h: 7, ch: "s"),     // strap around body
         Box(x: 5, y: 11, w: 11, h: 2, ch: "l"),   // belly light
-        Box(x: 16, y: 2, w: 2, h: 3, ch: "m"),    // mane
+        Box(x: 16, y: 2, w: 2, h: 2, ch: "m"),    // mane, upper step
+        Box(x: 16, y: 4, w: 1, h: 2, ch: "m"),    // mane, lower step (head reads apart from body)
         Box(x: 17, y: 3, w: 6, h: 6, ch: "b"),    // head
-        Box(x: 22, y: 6, w: 3, h: 3, ch: "l"),    // muzzle
-        Box(x: 17, y: 0, w: 2, h: 4, ch: "m"),    // ear
-        Box(x: 20, y: 0, w: 2, h: 4, ch: "m"),    // ear
-        Box(x: 20, y: 4, w: 1, h: 1, ch: "e"),    // eye
+        Box(x: 22, y: 6, w: 2, h: 3, ch: "l"),    // muzzle, shaped
+        Box(x: 24, y: 7, w: 1, h: 2, ch: "l"),    // muzzle, lower lip step
+        Box(x: 17, y: 0, w: 1, h: 1, ch: "m"),    // far ear, tapered tip
+        Box(x: 16, y: 1, w: 2, h: 3, ch: "m"),    // far ear, offset behind
+        Box(x: 21, y: 0, w: 1, h: 1, ch: "m"),    // near ear, tapered tip
+        Box(x: 20, y: 1, w: 2, h: 4, ch: "m"),    // near ear, taller and forward
+        Box(x: 21, y: 5, w: 1, h: 1, ch: "e"),    // eye
+        Box(x: 24, y: 7, w: 1, h: 1, ch: "m"),    // nostril
     ]
 
     private static func legs(_ positions: [(x: Int, y: Int, h: Int)]) -> [Box] {
@@ -116,12 +121,17 @@ enum MuleSprites {
         Box(x: 3, y: 9, w: 15, h: 6, ch: "b"),    // body, low
         Box(x: 8, y: 9, w: 1, h: 6, ch: "s"),
         Box(x: 4, y: 15, w: 14, h: 1, ch: "m"),   // folded legs
-        Box(x: 16, y: 5, w: 2, h: 3, ch: "m"),    // mane
+        Box(x: 16, y: 5, w: 2, h: 2, ch: "m"),    // mane, upper step
+        Box(x: 16, y: 7, w: 1, h: 2, ch: "m"),    // mane, lower step
         Box(x: 17, y: 6, w: 6, h: 6, ch: "b"),    // head, low
-        Box(x: 22, y: 9, w: 3, h: 3, ch: "l"),    // muzzle
-        Box(x: 17, y: 3, w: 2, h: 4, ch: "m"),    // ears, relaxed
-        Box(x: 20, y: 3, w: 2, h: 4, ch: "m"),
-        Box(x: 19, y: 8, w: 2, h: 1, ch: "m"),    // closed eye
+        Box(x: 22, y: 9, w: 2, h: 3, ch: "l"),    // muzzle, shaped
+        Box(x: 24, y: 10, w: 1, h: 2, ch: "l"),   // muzzle, lower lip step
+        Box(x: 17, y: 3, w: 1, h: 1, ch: "m"),    // far ear, tapered tip
+        Box(x: 16, y: 4, w: 2, h: 3, ch: "m"),    // far ear, offset behind
+        Box(x: 21, y: 3, w: 1, h: 1, ch: "m"),    // near ear, tapered tip
+        Box(x: 20, y: 4, w: 2, h: 4, ch: "m"),    // near ear, taller and forward
+        Box(x: 20, y: 8, w: 2, h: 1, ch: "m"),    // closed eye
+        Box(x: 24, y: 10, w: 1, h: 1, ch: "m"),   // nostril
     ])
 
     static func frame(_ boxes: [Box]) -> [String] {
