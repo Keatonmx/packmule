@@ -502,7 +502,7 @@ struct RestingMule: View {
 /// The mule properly asleep: curled down with little pixel Zs drifting up.
 struct SleepingMule: View {
     var height: CGFloat = 48
-    private let zMap = ["zzz", ".z.", "zzz"]
+    private let zMap = ["zzzz", "...z", "..z.", ".z..", "zzzz"]
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 1) {
