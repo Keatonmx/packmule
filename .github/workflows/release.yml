@@ -89,63 +89,66 @@ jobs:
           ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
-      - name: Archive (manual signing)
+      - name: Build (unsigned, the proven lane)
         run: |
           set -o pipefail
-          xcodebuild archive \
+          xcodebuild build \
             -project Packmule.xcodeproj -scheme "$SCHEME" -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath "$ARCHIVE" \
             -derivedDataPath "$DERIVED" \
             -clonedSourcePackagesDirPath "$SPM_CACHE" \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             MARKETING_VERSION="${{ github.event.inputs.marketing_version }}" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited)' \
-            2>&1 | tee xcodebuild-archive.log | (grep -E "error:|BUILD |ARCHIVE " || true)
-          test -d "$ARCHIVE"
+            2>&1 | tee xcodebuild-archive.log | (grep -E "error:|BUILD " || true)
+          test -x "$DERIVED/Build/Products/Release-iphoneos/Packmule.app/Packmule"
 
-      - name: Export and upload to App Store Connect
-        env:
-          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Sign by hand (codesign, inside out) and pack the IPA
+        run: |
+          set -euo pipefail
+          APP="$DERIVED/Build/Products/Release-iphoneos/Packmule.app"
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | awk '/Apple Distribution/ {print $2; exit}')
+          echo "signing with identity $IDENTITY"
+
+          # Embed the profiles where iOS expects them.
+          cp "$RUNNER_TEMP/app.mobileprovision" "$APP/embedded.mobileprovision"
+          cp "$RUNNER_TEMP/widgets.mobileprovision" "$APP/PlugIns/PackmuleWidgets.appex/embedded.mobileprovision"
+
+          # Each bundle signs with the exact entitlements its profile grants.
+          security cms -D -i "$RUNNER_TEMP/app.mobileprovision" > "$RUNNER_TEMP/app-profile.plist"
+          plutil -extract Entitlements xml1 -o "$RUNNER_TEMP/app-ents.plist" "$RUNNER_TEMP/app-profile.plist"
+          security cms -D -i "$RUNNER_TEMP/widgets.mobileprovision" > "$RUNNER_TEMP/widgets-profile.plist"
+          plutil -extract Entitlements xml1 -o "$RUNNER_TEMP/widgets-ents.plist" "$RUNNER_TEMP/widgets-profile.plist"
+
+          # Inside out: frameworks, then the extension, then the app seals it.
+          for FW in "$APP/Frameworks/"*; do
+            [ -e "$FW" ] || continue
+            codesign --force --sign "$IDENTITY" --timestamp=none "$FW"
+          done
+          codesign --force --sign "$IDENTITY" --entitlements "$RUNNER_TEMP/widgets-ents.plist" \
+            --timestamp=none "$APP/PlugIns/PackmuleWidgets.appex"
+          codesign --force --sign "$IDENTITY" --entitlements "$RUNNER_TEMP/app-ents.plist" \
+            --timestamp=none "$APP"
+          codesign --verify --deep --strict "$APP"
+          echo "signature verifies"
+
+          rm -rf ipa && mkdir -p ipa/Payload
+          cp -R "$APP" ipa/Payload/
+          (cd ipa && zip -qry ../Packmule-signed.ipa Payload)
+          ls -la Packmule-signed.ipa
+
+      - name: Upload to App Store Connect
         run: |
           set -o pipefail
-          cat > exportOptions.plist <<PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>destination</key>
-            <string>upload</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-            <key>teamID</key>
-            <string>$TEAM</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.redfernsoutpost.packmule</key>
-              <string>Packmule AppStore</string>
-              <key>com.redfernsoutpost.packmule.widgets</key>
-              <string>PackmuleWidgets AppStore</string>
-            </dict>
-            <key>manageAppVersionAndBuildNumber</key>
-            <false/>
-          </dict>
-          </plist>
-          PLIST
-          xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE" \
-            -exportOptionsPlist exportOptions.plist \
-            -exportPath export \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-            2>&1 | tee xcodebuild-export.log | (grep -E "error:|EXPORT |Upload" || true)
+          # altool reads API keys from ./private_keys by convention.
+          mkdir -p private_keys
+          cp "$RUNNER_TEMP/keys/AuthKey.p8" "private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+          xcrun altool --upload-app -f Packmule-signed.ipa -t ios \
+            --apiKey "${{ secrets.ASC_KEY_ID }}" \
+            --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
+            2>&1 | tee xcodebuild-export.log | (grep -vE "^\s*$" | tail -n 20)
 
       - name: Upload logs
         if: always()
