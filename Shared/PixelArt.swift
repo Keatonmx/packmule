@@ -79,27 +79,30 @@ enum MuleSprites {
         "e": Color(red: 0.10, green: 0.08, blue: 0.06),   // eye
     ]
 
-    /// Shared upper body: pack, body, head, ears, tail. Facing right.
+    /// Shared upper body, the 2026-09-07 pannier redesign (from the user's
+    /// approved concept): two flap topped bags instead of one crate, a
+    /// slightly lowered head, the settled face rules. Facing right.
     private static let torso: [Box] = [
-        Box(x: 6, y: 0, w: 6, h: 1, ch: "t"),     // crate lid highlight
-        Box(x: 5, y: 1, w: 8, h: 5, ch: "c"),     // crate
-        Box(x: 8, y: 1, w: 1, h: 5, ch: "s"),     // strap over crate
-        Box(x: 0, y: 7, w: 3, h: 2, ch: "m"),     // tail
-        Box(x: 0, y: 9, w: 2, h: 2, ch: "m"),     // tail tuft
-        Box(x: 3, y: 6, w: 15, h: 7, ch: "b"),    // body
-        Box(x: 8, y: 6, w: 1, h: 7, ch: "s"),     // strap around body
-        Box(x: 5, y: 11, w: 11, h: 2, ch: "l"),   // belly light
-        Box(x: 16, y: 2, w: 2, h: 2, ch: "m"),    // mane, upper step
-        Box(x: 16, y: 4, w: 1, h: 2, ch: "m"),    // mane, lower step (head reads apart from body)
-        Box(x: 17, y: 3, w: 6, h: 6, ch: "b"),    // head
-        Box(x: 22, y: 6, w: 2, h: 3, ch: "l"),    // muzzle, shaped
-        Box(x: 24, y: 7, w: 1, h: 2, ch: "l"),    // muzzle, lower lip step
-        Box(x: 17, y: 0, w: 1, h: 1, ch: "m"),    // far ear, tapered tip
-        Box(x: 16, y: 1, w: 2, h: 3, ch: "m"),    // far ear, offset behind
-        Box(x: 21, y: 0, w: 1, h: 1, ch: "m"),    // near ear, tapered tip
-        Box(x: 20, y: 1, w: 2, h: 4, ch: "m"),    // near ear, taller and forward
-        Box(x: 21, y: 5, w: 1, h: 1, ch: "e"),    // eye
-        Box(x: 24, y: 7, w: 1, h: 1, ch: "m"),    // nostril
+        Box(x: 4, y: 0, w: 4, h: 2, ch: "t"),     // rear pannier flap
+        Box(x: 4, y: 2, w: 4, h: 5, ch: "c"),     // rear pannier bag
+        Box(x: 9, y: 0, w: 4, h: 2, ch: "t"),     // front pannier flap
+        Box(x: 9, y: 2, w: 4, h: 5, ch: "c"),     // front pannier bag
+        Box(x: 8, y: 0, w: 1, h: 7, ch: "s"),     // strap between the bags
+        Box(x: 1, y: 7, w: 2, h: 2, ch: "m"),     // tail
+        Box(x: 0, y: 9, w: 2, h: 2, ch: "m"),     // tail tuft, drooping
+        Box(x: 3, y: 7, w: 14, h: 6, ch: "b"),    // body, compact
+        Box(x: 8, y: 7, w: 1, h: 6, ch: "s"),     // girth strap under the bags
+        Box(x: 5, y: 11, w: 10, h: 2, ch: "l"),   // belly light
+        Box(x: 16, y: 5, w: 1, h: 2, ch: "m"),    // mane step (head reads apart)
+        Box(x: 17, y: 4, w: 6, h: 6, ch: "b"),    // head, a touch lower
+        Box(x: 21, y: 7, w: 4, h: 3, ch: "l"),    // muzzle, big and friendly
+        Box(x: 24, y: 6, w: 1, h: 1, ch: "l"),    // muzzle, upper step
+        Box(x: 17, y: 1, w: 1, h: 1, ch: "m"),    // far ear, tapered tip
+        Box(x: 16, y: 2, w: 2, h: 3, ch: "m"),    // far ear, offset behind
+        Box(x: 21, y: 1, w: 1, h: 1, ch: "m"),    // near ear, tapered tip
+        Box(x: 20, y: 2, w: 2, h: 4, ch: "m"),    // near ear, taller and forward
+        Box(x: 21, y: 6, w: 1, h: 1, ch: "e"),    // eye
+        Box(x: 24, y: 8, w: 1, h: 1, ch: "m"),    // nostril
     ]
 
     private static func legs(_ positions: [(x: Int, y: Int, h: Int)]) -> [Box] {
@@ -109,23 +112,25 @@ enum MuleSprites {
         }
     }
 
-    static let walkA = frame(torso + legs([(4, 13, 4), (8, 13, 4), (12, 13, 4), (16, 13, 4)]))
-    static let walkB = frame(torso + legs([(3, 13, 4), (9, 14, 3), (12, 14, 3), (17, 13, 4)]))
+    static let walkA = frame(torso + legs([(4, 13, 4), (8, 13, 4), (12, 13, 4), (15, 13, 4)]))
+    static let walkB = frame(torso + legs([(3, 13, 4), (9, 14, 3), (12, 14, 3), (16, 13, 4)]))
 
     /// Legs folded, head low, eye shut: the mule off duty.
     static let resting: [String] = frame([
-        Box(x: 0, y: 10, w: 3, h: 2, ch: "m"),    // tail
-        Box(x: 6, y: 3, w: 6, h: 1, ch: "t"),
-        Box(x: 5, y: 4, w: 8, h: 5, ch: "c"),
-        Box(x: 8, y: 4, w: 1, h: 5, ch: "s"),
-        Box(x: 3, y: 9, w: 15, h: 6, ch: "b"),    // body, low
-        Box(x: 8, y: 9, w: 1, h: 6, ch: "s"),
-        Box(x: 4, y: 15, w: 14, h: 1, ch: "m"),   // folded legs
-        Box(x: 16, y: 5, w: 2, h: 2, ch: "m"),    // mane, upper step
-        Box(x: 16, y: 7, w: 1, h: 2, ch: "m"),    // mane, lower step
+        Box(x: 1, y: 9, w: 2, h: 2, ch: "m"),     // tail
+        Box(x: 0, y: 11, w: 2, h: 2, ch: "m"),    // tail tuft, drooping
+        Box(x: 4, y: 2, w: 4, h: 2, ch: "t"),     // rear pannier flap
+        Box(x: 4, y: 4, w: 4, h: 5, ch: "c"),     // rear pannier bag
+        Box(x: 9, y: 2, w: 4, h: 2, ch: "t"),     // front pannier flap
+        Box(x: 9, y: 4, w: 4, h: 5, ch: "c"),     // front pannier bag
+        Box(x: 8, y: 2, w: 1, h: 7, ch: "s"),     // strap between the bags
+        Box(x: 3, y: 9, w: 14, h: 6, ch: "b"),    // body, low
+        Box(x: 8, y: 9, w: 1, h: 6, ch: "s"),     // girth strap
+        Box(x: 4, y: 15, w: 12, h: 1, ch: "m"),   // folded legs
+        Box(x: 16, y: 7, w: 1, h: 2, ch: "m"),    // mane step
         Box(x: 17, y: 6, w: 6, h: 6, ch: "b"),    // head, low
-        Box(x: 22, y: 9, w: 2, h: 3, ch: "l"),    // muzzle, shaped
-        Box(x: 24, y: 10, w: 1, h: 2, ch: "l"),   // muzzle, lower lip step
+        Box(x: 21, y: 9, w: 4, h: 3, ch: "l"),    // muzzle, big and friendly
+        Box(x: 24, y: 8, w: 1, h: 1, ch: "l"),    // muzzle, upper step
         Box(x: 17, y: 3, w: 1, h: 1, ch: "m"),    // far ear, tapered tip
         Box(x: 16, y: 4, w: 2, h: 3, ch: "m"),    // far ear, offset behind
         Box(x: 21, y: 3, w: 1, h: 1, ch: "m"),    // near ear, tapered tip
