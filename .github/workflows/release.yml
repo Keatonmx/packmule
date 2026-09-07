@@ -1,0 +1,117 @@
+name: Release to App Store Connect
+
+# Manual trigger only. Builds a SIGNED archive on the macOS runner using
+# App Store Connect API key auth (no Mac, no local certificates: xcodebuild's
+# cloud signing registers bundle IDs and creates profiles on the fly), then
+# uploads straight to App Store Connect. The build lands in TestFlight
+# automatically once processing finishes.
+#
+# Required repository secrets:
+#   APPLE_TEAM_ID   - from developer.apple.com, Membership page
+#   ASC_KEY_ID      - App Store Connect API key ID
+#   ASC_ISSUER_ID   - App Store Connect issuer ID
+#   ASC_KEY_P8      - the .p8 private key, base64 encoded
+#
+# The SIDELOAD compilation condition is stripped here, so the personal
+# home-server seed does not ship to the public.
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: "Version shown on the store (like 1.0)"
+        required: true
+        default: "1.0"
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      SCHEME: Packmule
+      DERIVED: ${{ github.workspace }}/DerivedData
+      SPM_CACHE: ${{ github.workspace }}/SourcePackages
+      ARCHIVE: ${{ github.workspace }}/Packmule.xcarchive
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app 2>/dev/null || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | grep -v beta | sort -V | tail -n 1)"
+          xcodebuild -version
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SPM_CACHE }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Packmule.xcodeproj/project.pbxproj') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Write the App Store Connect API key
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          echo "${{ secrets.ASC_KEY_P8 }}" | base64 --decode > "$RUNNER_TEMP/keys/AuthKey.p8"
+          test -s "$RUNNER_TEMP/keys/AuthKey.p8"
+
+      - name: Archive (signed, cloud managed profiles)
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Packmule.xcodeproj -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE" \
+            -derivedDataPath "$DERIVED" \
+            -clonedSourcePackagesDirPath "$SPM_CACHE" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="${{ github.event.inputs.marketing_version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited)' \
+            2>&1 | tee xcodebuild-archive.log | (grep -E "error:|BUILD |ARCHIVE " || true)
+          test -d "$ARCHIVE"
+
+      - name: Export and upload to App Store Connect
+        run: |
+          set -o pipefail
+          cat > exportOptions.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            2>&1 | tee xcodebuild-export.log | (grep -E "error:|EXPORT |Upload" || true)
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-logs
+          path: |
+            xcodebuild-archive.log
+            xcodebuild-export.log
+          if-no-files-found: ignore
