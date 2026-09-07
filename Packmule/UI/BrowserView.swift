@@ -362,10 +362,13 @@ struct FileRow: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(entry.isDirectory ? theme.tint : theme.well)
-                        Image(systemName: FileGlyph.symbol(for: entry))
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(entry.isDirectory ? theme.accentText
-                                             : (FileGlyph.tint(for: entry) ?? Palette.text55))
+                        if entry.isDirectory {
+                            GlyphIcon(map: GlyphSprites.sack, size: 24)
+                        } else {
+                            Image(systemName: FileGlyph.symbol(for: entry))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(FileGlyph.tint(for: entry) ?? Palette.text55)
+                        }
                     }
                     .frame(width: 36, height: 36)
 

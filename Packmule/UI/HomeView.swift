@@ -47,11 +47,13 @@ struct HomeView: View {
                     SectionHeader(title: "This iPhone")
                     Card {
                         NavRow(title: "Browse this iPhone",
-                               subtitle: "Downloads land here, visible in the Files app") {
+                               subtitle: "Downloads land here, visible in the Files app",
+                               glyph: GlyphSprites.saddlebag) {
                             model.openLocal()
                         }
                         NavRow(title: "Photos",
-                               subtitle: "Read only. Asks for photo access once, used only to show your library and copy items out of it") {
+                               subtitle: "Read only. Asks for photo access once, used only to show your library and copy items out of it",
+                               glyph: GlyphSprites.album) {
                             model.openPhotos()
                         }
                         HostRow(showsSeparator: true)
@@ -180,7 +182,8 @@ struct LinkedFolderRow: View {
 
     var body: some View {
         NavRow(title: folder.name,
-               subtitle: "Linked folder, served while hosting. Hold to unlink") {
+               subtitle: "Linked folder, served while hosting. Hold to unlink",
+               glyph: GlyphSprites.sack) {
             model.openLinked(folder)
         }
         .contextMenu {
@@ -246,9 +249,7 @@ struct ServerRow: View {
                     HStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.tint)
-                            Image(systemName: Self.icon(for: server.kind))
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundColor(theme.accentText)
+                            GlyphIcon(map: Self.glyph(for: server.kind), size: 28)
                         }
                         .frame(width: 44, height: 44)
                         .overlay(alignment: .bottomTrailing) {
@@ -315,12 +316,12 @@ struct ServerRow: View {
         return server.addressLine
     }
 
-    static func icon(for kind: ServerKind) -> String {
+    static func glyph(for kind: ServerKind) -> [String] {
         switch kind {
-        case .smb: return "externaldrive.fill"
-        case .ftp: return "arrow.up.arrow.down"
-        case .sftp: return "terminal.fill"
-        case .jellyfin: return "play.rectangle.fill"
+        case .smb: return GlyphSprites.barn
+        case .ftp: return GlyphSprites.signpost
+        case .sftp: return GlyphSprites.strongbox
+        case .jellyfin: return GlyphSprites.lantern
         }
     }
 }
@@ -343,8 +344,7 @@ struct NearbyRow: View {
                         HStack(spacing: 12) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.tint)
-                                PixelSprite(map: MuleSprites.walkA, palette: MuleSprites.palette)
-                                    .frame(width: 30, height: 21)
+                                GlyphIcon(map: GlyphSprites.mules, size: 28)
                             }
                             .frame(width: 44, height: 44)
 

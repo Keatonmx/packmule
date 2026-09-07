@@ -342,12 +342,14 @@ struct SettingsRow<Trailing: View>: View {
 
 /// Tappable row with optional detail text and a chevron.
 struct NavRow: View {
+    @Environment(\.theme) private var theme
     let title: String
     var subtitle: String? = nil
     var detail: String? = nil
     var titleColor: Color = .white
     var showsSeparator = true
     var showsChevron = true
+    var glyph: [String]? = nil
     let action: () -> Void
 
     var body: some View {
@@ -357,6 +359,14 @@ struct NavRow: View {
                 action()
             } label: {
                 HStack(spacing: 8) {
+                    if let glyph {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(theme.tint)
+                            GlyphIcon(map: glyph, size: 24)
+                        }
+                        .frame(width: 36, height: 36)
+                        .padding(.trailing, 4)
+                    }
                     VStack(alignment: .leading, spacing: 1) {
                         Text(title).font(Typography.row).foregroundColor(titleColor)
                         if let subtitle {
@@ -478,6 +488,16 @@ struct SettingsGlyph: View {
 }
 
 /// The pixel mule walking in place, for transfer bars and cards.
+/// One 16x16 outpost glyph, rendered crisp at a given point size.
+struct GlyphIcon: View {
+    let map: [String]
+    var size: CGFloat = 26
+    var body: some View {
+        PixelSprite(map: map, palette: MuleSprites.palette)
+            .frame(width: size, height: size)
+    }
+}
+
 struct WalkingMule: View {
     var height: CGFloat = 22
     var body: some View {

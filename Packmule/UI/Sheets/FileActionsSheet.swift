@@ -34,10 +34,13 @@ struct FileActionsSheet: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(entry.isDirectory ? theme.tint : theme.well)
-                    Image(systemName: FileGlyph.symbol(for: entry))
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(entry.isDirectory ? theme.accentText
-                                         : (FileGlyph.tint(for: entry) ?? Palette.text70))
+                    if entry.isDirectory {
+                        GlyphIcon(map: GlyphSprites.sack, size: 30)
+                    } else {
+                        Image(systemName: FileGlyph.symbol(for: entry))
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(FileGlyph.tint(for: entry) ?? Palette.text70)
+                    }
                 }
                 .frame(width: 46, height: 46)
                 VStack(alignment: .leading, spacing: 2) {

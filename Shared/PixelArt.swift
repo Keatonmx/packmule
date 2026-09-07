@@ -170,3 +170,111 @@ enum MuleSprites {
         Int(fraction * 100) % 2 == 0 ? walkA : walkB
     }
 }
+
+// MARK: - The outpost glyph set, 16 by 16
+
+/// UI icons in the mule's world: a barn for SMB, a signpost for FTP, a
+/// strongbox for SFTP, a lantern for media servers, a saddlebag for this
+/// phone, an album for Photos, two mules meeting for a nearby Packmule,
+/// and a feed sack for folders. Compositions from the 2026-09-07 ChatGPT
+/// concept round, pixels placed here. Same palette as the mule so they
+/// feel like one world in every theme.
+enum GlyphSprites {
+    static let size = 16
+
+    private static func frame(_ boxes: [(x: Int, y: Int, w: Int, h: Int, ch: Character)]) -> [String] {
+        var grid = Array(repeating: Array(repeating: Character("."), count: size), count: size)
+        for box in boxes {
+            guard box.x >= 0, box.y >= 0 else { continue }
+            for yy in box.y..<min(size, box.y + box.h) {
+                for xx in box.x..<min(size, box.x + box.w) {
+                    grid[yy][xx] = box.ch
+                }
+            }
+        }
+        var outlined = grid
+        for y in 0..<size {
+            for x in 0..<size where grid[y][x] == "." {
+                let neighbours = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+                let touchesPaint = neighbours.contains { nx, ny in
+                    nx >= 0 && ny >= 0 && nx < size && ny < size && grid[ny][nx] != "."
+                }
+                if touchesPaint {
+                    outlined[y][x] = "o"
+                }
+            }
+        }
+        return outlined.map { String($0) }
+    }
+
+    /// SMB server: a barn with a crossbuck door.
+    static let barn = frame([
+        (7, 1, 2, 1, "b"), (6, 2, 4, 1, "b"), (5, 3, 6, 1, "b"),
+        (4, 4, 8, 1, "b"), (3, 5, 10, 1, "b"),
+        (3, 6, 10, 8, "l"),
+        (7, 7, 2, 1, "s"),
+        (6, 9, 4, 5, "s"),
+        (6, 9, 1, 1, "t"), (9, 9, 1, 1, "t"), (7, 10, 1, 1, "t"), (8, 10, 1, 1, "t"),
+        (7, 11, 1, 1, "t"), (8, 11, 1, 1, "t"), (6, 12, 1, 1, "t"), (9, 12, 1, 1, "t"),
+    ])
+
+    /// FTP: a signpost with two boards.
+    static let signpost = frame([
+        (7, 1, 2, 13, "m"),
+        (3, 3, 9, 3, "t"), (12, 4, 1, 1, "t"),
+        (4, 8, 9, 3, "c"), (3, 9, 1, 1, "c"),
+    ])
+
+    /// SFTP: a strapped strongbox with a keyhole.
+    static let strongbox = frame([
+        (2, 3, 12, 3, "t"),
+        (2, 6, 12, 8, "c"),
+        (4, 3, 1, 11, "s"), (11, 3, 1, 11, "s"),
+        (6, 7, 4, 5, "l"),
+        (7, 8, 2, 2, "e"),
+    ])
+
+    /// Media server: a lantern, lit.
+    static let lantern = frame([
+        (6, 1, 4, 1, "m"), (5, 2, 1, 1, "m"), (10, 2, 1, 1, "m"),
+        (6, 2, 4, 1, "m"),
+        (5, 3, 6, 9, "m"),
+        (6, 5, 4, 5, "l"),
+        (7, 6, 2, 2, "t"),
+        (4, 12, 8, 1, "m"),
+    ])
+
+    /// This phone: the saddlebag.
+    static let saddlebag = frame([
+        (3, 3, 10, 1, "b"), (2, 4, 12, 9, "b"), (3, 13, 10, 1, "b"),
+        (3, 3, 4, 1, "t"), (9, 3, 4, 1, "t"),
+        (2, 6, 5, 1, "s"), (9, 6, 5, 1, "s"),
+        (7, 3, 2, 11, "m"),
+        (6, 7, 4, 3, "s"), (7, 8, 2, 1, "t"),
+    ])
+
+    /// Photos: a leather bound album, one picture showing.
+    static let album = frame([
+        (3, 2, 10, 12, "c"),
+        (3, 2, 2, 12, "t"),
+        (6, 4, 6, 8, "l"),
+        (9, 5, 2, 1, "b"),
+        (7, 10, 2, 1, "m"), (6, 11, 6, 1, "m"),
+    ])
+
+    /// A nearby Packmule phone: two mules meeting.
+    static let mules = frame([
+        (2, 5, 5, 6, "b"), (2, 5, 1, 6, "m"), (3, 2, 1, 3, "m"),
+        (5, 8, 2, 3, "l"), (4, 7, 1, 1, "e"), (2, 11, 4, 1, "b"),
+        (9, 5, 5, 6, "b"), (13, 5, 1, 6, "m"), (12, 2, 1, 3, "m"),
+        (9, 8, 2, 3, "l"), (11, 7, 1, 1, "e"), (10, 11, 4, 1, "b"),
+    ])
+
+    /// Folder: a feed sack with a patch.
+    static let sack = frame([
+        (6, 2, 4, 2, "b"),
+        (5, 4, 6, 1, "m"),
+        (4, 5, 8, 1, "b"), (3, 6, 10, 7, "b"), (4, 13, 8, 1, "b"),
+        (8, 9, 2, 2, "t"),
+    ])
+}
