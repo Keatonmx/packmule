@@ -142,9 +142,9 @@ jobs:
       - name: Upload to App Store Connect
         run: |
           set -o pipefail
-          # altool reads API keys from ./private_keys by convention.
-          mkdir -p private_keys
-          cp "$RUNNER_TEMP/keys/AuthKey.p8" "private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+          # altool reads API keys from ~/private_keys by convention.
+          mkdir -p "$HOME/private_keys"
+          cp "$RUNNER_TEMP/keys/AuthKey.p8" "$HOME/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
           xcrun altool --upload-app -f Packmule-signed.ipa -t ios \
             --apiKey "${{ secrets.ASC_KEY_ID }}" \
             --apiIssuer "${{ secrets.ASC_ISSUER_ID }}" \
