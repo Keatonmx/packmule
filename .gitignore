@@ -4,3 +4,4 @@ build/
 *.ipa
 xcuserdata/
 .DS_Store
+__pycache__/
