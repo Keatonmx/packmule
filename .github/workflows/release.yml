@@ -60,7 +60,24 @@ jobs:
           test -s "$RUNNER_TEMP/keys/AuthKey.p8"
           head -c 27 "$RUNNER_TEMP/keys/AuthKey.p8" | grep -q "BEGIN PRIVATE KEY" && echo "key decodes cleanly"
 
-      - name: Archive (signed, cloud managed profiles)
+      - name: Install the signing identity and profiles
+        run: |
+          printf '%s' "${{ secrets.DIST_P12_B64 }}" | tr -d '\r\n\t ' | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          printf '%s' "${{ secrets.PROFILE_APP_B64 }}" | tr -d '\r\n\t ' | base64 --decode > "$RUNNER_TEMP/app.mobileprovision"
+          printf '%s' "${{ secrets.PROFILE_WIDGETS_B64 }}" | tr -d '\r\n\t ' | base64 --decode > "$RUNNER_TEMP/widgets.mobileprovision"
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p ci "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p ci "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "${{ secrets.DIST_P12_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci "$KEYCHAIN" > /dev/null
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/app.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/packmule-app.mobileprovision"
+          cp "$RUNNER_TEMP/widgets.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/packmule-widgets.mobileprovision"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Archive (manual signing)
         run: |
           set -o pipefail
           xcodebuild archive \
@@ -69,12 +86,7 @@ jobs:
             -archivePath "$ARCHIVE" \
             -derivedDataPath "$DERIVED" \
             -clonedSourcePackagesDirPath "$SPM_CACHE" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Automatic \
             MARKETING_VERSION="${{ github.event.inputs.marketing_version }}" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited)' \
@@ -82,9 +94,11 @@ jobs:
           test -d "$ARCHIVE"
 
       - name: Export and upload to App Store Connect
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -o pipefail
-          cat > exportOptions.plist <<'PLIST'
+          cat > exportOptions.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -93,6 +107,19 @@ jobs:
             <string>app-store</string>
             <key>destination</key>
             <string>upload</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>teamID</key>
+            <string>$TEAM</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.redfernsoutpost.packmule</key>
+              <string>Packmule AppStore</string>
+              <key>com.redfernsoutpost.packmule.widgets</key>
+              <string>PackmuleWidgets AppStore</string>
+            </dict>
             <key>manageAppVersionAndBuildNumber</key>
             <false/>
           </dict>

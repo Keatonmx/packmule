@@ -244,8 +244,13 @@ def main():
         'VALIDATE_PRODUCT': 'YES',
     })
 
+    # Manual signing with API-minted App Store profiles: sideload and simulator
+    # builds pass CODE_SIGNING_ALLOWED=NO so these settings only bite in the
+    # release lane, where they are exactly what we want (cloud signing on CI
+    # proved flaky and dev profiles need registered devices a fresh team lacks).
     shared_target_settings = {
-        'CODE_SIGN_STYLE': 'Automatic',
+        'CODE_SIGN_IDENTITY': 'Apple Distribution',
+        'CODE_SIGN_STYLE': 'Manual',
         'CURRENT_PROJECT_VERSION': '1',
         'DEVELOPMENT_TEAM': '',
         'GENERATE_INFOPLIST_FILE': 'NO',
@@ -267,6 +272,7 @@ def main():
         'INFOPLIST_FILE': f'{SRC_DIR}/Resources/Info.plist',
         'LD_RUNPATH_SEARCH_PATHS': ['$(inherited)', '@executable_path/Frameworks'],
         'PRODUCT_BUNDLE_IDENTIFIER': BUNDLE_ID,
+        'PROVISIONING_PROFILE_SPECIFIER': 'Packmule AppStore',
     })
     widget_target_settings = dict(shared_target_settings, **{
         'INFOPLIST_FILE': f'{WIDGET_DIR}/Info.plist',
@@ -274,6 +280,7 @@ def main():
         'LD_RUNPATH_SEARCH_PATHS': ['$(inherited)', '@executable_path/Frameworks',
                                     '@executable_path/../../Frameworks'],
         'PRODUCT_BUNDLE_IDENTIFIER': BUNDLE_ID + '.widgets',
+        'PROVISIONING_PROFILE_SPECIFIER': 'PackmuleWidgets AppStore',
         'SKIP_INSTALL': 'YES',
     })
 
