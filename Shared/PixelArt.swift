@@ -234,13 +234,17 @@ enum GlyphSprites {
         (7, 8, 2, 2, "e"),
     ])
 
-    /// Media server: a lantern, lit.
+    /// Media server: a lantern, lit. Glowing glass cage between dark
+    /// posts, chimney cap, handle arc, flared base, flame on a wick.
     static let lantern = frame([
-        (6, 1, 4, 1, "m"), (5, 2, 1, 1, "m"), (10, 2, 1, 1, "m"),
-        (6, 2, 4, 1, "m"),
-        (5, 3, 6, 9, "m"),
-        (6, 5, 4, 5, "l"),
-        (7, 6, 2, 2, "t"),
+        (7, 1, 2, 1, "m"), (6, 2, 1, 1, "m"), (9, 2, 1, 1, "m"),
+        (6, 3, 4, 1, "m"),
+        (5, 4, 6, 1, "m"),
+        (4, 5, 8, 6, "t"),
+        (4, 5, 1, 6, "s"), (11, 5, 1, 6, "s"),
+        (7, 6, 1, 1, "l"), (7, 7, 2, 2, "l"),
+        (7, 9, 2, 1, "m"),
+        (5, 11, 6, 1, "m"),
         (4, 12, 8, 1, "m"),
     ])
 
